@@ -7,7 +7,6 @@ interface FormStepProps {
   children: ReactNode;
   onNext?: () => void;
   onPrevious?: () => void;
-  onSubmit?: () => void;
   showPrevious?: boolean;
   showNext?: boolean;
   showSubmit?: boolean;
@@ -19,7 +18,6 @@ export default function FormStep({
   children, 
   onNext, 
   onPrevious, 
-  onSubmit,
   showPrevious = false,
   showNext = false,
   showSubmit = false,
