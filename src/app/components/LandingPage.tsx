@@ -127,12 +127,6 @@ export default function LandingPage() {
     setCompletedForms(completed);
   }, []);
 
-  const handleFormClick = (route: string) => {
-    console.log('Navegando a:', route);
-    router.push(route);
-  };
-
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header minimalista */}
