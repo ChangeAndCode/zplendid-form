@@ -1,7 +1,7 @@
 'use client';
 
 import { useLanguage } from '../context/LanguageContext';
-import { useHealthForm } from '../hooks/useHealthForm';
+import { useHealthForm, type HealthFormData } from '../hooks/useHealthForm';
 import LanguageSwitcher from './organisms/LanguageSwitcher';
 import ProgressBar from './organisms/ProgressBar';
 import PersonalInfoStep from './templates/PersonalInfoStep';
@@ -22,7 +22,15 @@ export default function HealthQuestionnaireFormModular() {
     isBariatricSurgery,
     isPlasticSurgery,
     totalSteps,
+    setFormData,
   } = useHealthForm();
+
+  const handleFormDataUpdate = (fieldName: string, value: string) => {
+    setFormData((prev: HealthFormData) => ({
+      ...prev,
+      [fieldName]: value
+    }));
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -54,6 +62,7 @@ export default function HealthQuestionnaireFormModular() {
               onInputChange={handleInputChange}
               onNext={handleNext}
               onPrevious={handlePrevious}
+              onFormDataUpdate={handleFormDataUpdate}
             />
           )}
 

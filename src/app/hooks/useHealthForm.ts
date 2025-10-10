@@ -1,8 +1,14 @@
-import { useState, ChangeEvent, FormEvent } from 'react';
+import { useState, ChangeEvent, FormEvent, useEffect } from 'react';
 
 export type SurgeryInterest = 'first-time-bariatric' | 'revisional-bariatric' | 'primary-plastic' | 'post-bariatric-plastic' | 'metabolic-rehab' | '';
 
-export interface FormData {
+const STORAGE_KEYS = {
+  FORM_DATA: 'zplendid_form_data',
+  CURRENT_STEP: 'zplendid_current_step',
+  LAST_SAVED: 'zplendid_last_saved'
+};
+
+export interface HealthFormData {
   // Información del Paciente
   firstName: string;
   lastName: string;
@@ -64,58 +70,107 @@ export interface FormData {
   additionalComments: string;
 }
 
+// Mantener compatibilidad con código existente
+export type FormData = HealthFormData;
+
+// Función para cargar datos del localStorage
+const loadFromStorage = (): { formData: HealthFormData | null; currentStep: number } => {
+  if (typeof window === 'undefined') return { formData: null, currentStep: 1 };
+  
+  try {
+    const savedFormData = localStorage.getItem(STORAGE_KEYS.FORM_DATA);
+    const savedStep = localStorage.getItem(STORAGE_KEYS.CURRENT_STEP);
+    
+    return {
+      formData: savedFormData ? JSON.parse(savedFormData) : null,
+      currentStep: savedStep ? parseInt(savedStep, 10) : 1
+    };
+  } catch (error) {
+    console.error('Error al cargar datos guardados:', error);
+    return { formData: null, currentStep: 1 };
+  }
+};
+
+const initialFormData: HealthFormData = {
+  firstName: '',
+  lastName: '',
+  dateOfBirth: '',
+  age: '',
+  gender: '',
+  addressLine: '',
+  city: '',
+  country: '',
+  state: '',
+  zipcode: '',
+  phoneNumber: '',
+  email: '',
+  preferredContact: 'text',
+  occupation: '',
+  employer: '',
+  education: '',
+  surgeryInterest: '',
+  specificProcedure: '',
+  surgeryReadiness: '',
+  measurementSystem: 'standard',
+  heightFeet: '',
+  heightInches: '',
+  heightCm: '',
+  weightLbs: '',
+  weightKg: '',
+  bmi: '',
+  highestWeight: '',
+  highestWeightDate: '',
+  lowestWeight: '',
+  lowestWeightDate: '',
+  currentWeight: '',
+  goalWeight: '',
+  emergencyFirstName: '',
+  emergencyLastName: '',
+  emergencyRelationship: '',
+  emergencyPhone: '',
+  previousWeightLossSurgery: 'no',
+  sleepApnea: 'no',
+  useCpap: 'no',
+  highBloodPressure: 'no',
+  diabetes: 'no',
+  useInsulin: 'no',
+  heartburnFrequency: '0',
+  currentlySmoking: 'no',
+  alcoholConsumption: 'no',
+  medications: '',
+  allergies: '',
+  additionalComments: '',
+};
+
 export function useHealthForm() {
+  const [isLoaded, setIsLoaded] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<FormData>({
-    firstName: '',
-    lastName: '',
-    dateOfBirth: '',
-    age: '',
-    gender: '',
-    addressLine: '',
-    city: '',
-    country: '',
-    state: '',
-    zipcode: '',
-    phoneNumber: '',
-    email: '',
-    preferredContact: 'text',
-    occupation: '',
-    employer: '',
-    education: '',
-    surgeryInterest: '',
-    specificProcedure: '',
-    surgeryReadiness: '',
-    measurementSystem: 'standard',
-    heightFeet: '',
-    heightInches: '',
-    heightCm: '',
-    weightLbs: '',
-    weightKg: '',
-    bmi: '',
-    highestWeight: '',
-    highestWeightDate: '',
-    lowestWeight: '',
-    lowestWeightDate: '',
-    currentWeight: '',
-    goalWeight: '',
-    emergencyFirstName: '',
-    emergencyLastName: '',
-    emergencyRelationship: '',
-    emergencyPhone: '',
-    previousWeightLossSurgery: 'no',
-    sleepApnea: 'no',
-    useCpap: 'no',
-    highBloodPressure: 'no',
-    diabetes: 'no',
-    useInsulin: 'no',
-    heartburnFrequency: '0',
-    currentlySmoking: 'no',
-    alcoholConsumption: 'no',
-    medications: '',
-    allergies: '',
-    additionalComments: '',
-  });
+  const [formData, setFormData] = useState<HealthFormData>(initialFormData);
+
+  // Cargar datos guardados al montar el componente
+  useEffect(() => {
+    const { formData: savedData, currentStep: savedStep } = loadFromStorage();
+    
+    if (savedData) {
+      setFormData(savedData);
+      setCurrentStep(savedStep);
+    }
+    
+    setIsLoaded(true);
+  }, []);
+
+  // Guardar datos automáticamente cuando cambien
+  useEffect(() => {
+    if (!isLoaded) return; // No guardar en la carga inicial
+    
+    try {
+      localStorage.setItem(STORAGE_KEYS.FORM_DATA, JSON.stringify(formData));
+      localStorage.setItem(STORAGE_KEYS.CURRENT_STEP, currentStep.toString());
+      localStorage.setItem(STORAGE_KEYS.LAST_SAVED, new Date().toISOString());
+    } catch (error) {
+      console.error('Error al guardar datos:', error);
+    }
+  }, [formData, currentStep, isLoaded]);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -160,13 +215,50 @@ export function useHealthForm() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const clearFormData = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.FORM_DATA);
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_STEP);
+      localStorage.removeItem(STORAGE_KEYS.LAST_SAVED);
+      setFormData(initialFormData);
+      setCurrentStep(1);
+    } catch (error) {
+      console.error('Error al limpiar datos:', error);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>, language: 'es' | 'en') => {
     e.preventDefault();
     console.log('Formulario enviado:', formData);
-    const successMessage = language === 'es' 
-      ? 'Formulario enviado exitosamente' 
-      : 'Form submitted successfully';
-    alert(successMessage);
+    
+    try {
+      // Aquí se integrará la generación de PDF y envío de correo
+      const response = await fetch('/api/submit-form', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ formData, language }),
+      });
+
+      if (response.ok) {
+        const successMessage = language === 'es' 
+          ? 'Formulario enviado exitosamente. Recibirás un correo con la confirmación.' 
+          : 'Form submitted successfully. You will receive a confirmation email.';
+        alert(successMessage);
+        
+        // Limpiar datos después de envío exitoso
+        clearFormData();
+      } else {
+        throw new Error('Error en el envío');
+      }
+    } catch (error) {
+      const errorMessage = language === 'es'
+        ? 'Error al enviar el formulario. Por favor, intenta de nuevo.'
+        : 'Error submitting the form. Please try again.';
+      alert(errorMessage);
+      console.error('Error:', error);
+    }
   };
 
   const isBariatricSurgery = formData.surgeryInterest === 'first-time-bariatric' || formData.surgeryInterest === 'revisional-bariatric';
@@ -183,7 +275,8 @@ export function useHealthForm() {
     isBariatricSurgery,
     isPlasticSurgery,
     totalSteps,
-    setFormData
+    setFormData,
+    clearFormData,
   };
 }
 

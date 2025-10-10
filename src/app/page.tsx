@@ -1,7 +1,7 @@
-import HealthQuestionnaireFormModular from './components/HealthQuestionnaireFormModular';
+import LandingPage from './components/LandingPage';
 
 export default function Home() {
   return (
-    <HealthQuestionnaireFormModular />
+    <LandingPage />
   );
 }

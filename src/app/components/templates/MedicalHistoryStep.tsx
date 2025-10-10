@@ -4,6 +4,7 @@ import FormStep from '../organisms/FormStep';
 import SubSection from '../organisms/SubSection';
 import SelectField from '../molecules/SelectField';
 import TextareaField from '../molecules/TextareaField';
+import HealthAssistant from '../atoms/HealthAssistant';
 import { FormData } from '../../hooks/useHealthForm';
 
 interface MedicalHistoryStepProps {
@@ -11,10 +12,26 @@ interface MedicalHistoryStepProps {
   onInputChange: (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
   onNext: () => void;
   onPrevious: () => void;
+  onFormDataUpdate?: (fieldName: string, value: string) => void;
 }
 
-export default function MedicalHistoryStep({ formData, onInputChange, onNext, onPrevious }: MedicalHistoryStepProps) {
+export default function MedicalHistoryStep({ formData, onInputChange, onNext, onPrevious, onFormDataUpdate }: MedicalHistoryStepProps) {
   const { t } = useLanguage();
+
+  const handleAssistantSuggestion = (fieldName: string, value: string) => {
+    if (onFormDataUpdate) {
+      onFormDataUpdate(fieldName, value);
+    } else {
+      // Fallback usando el evento sintético
+      const event = {
+        target: {
+          name: fieldName,
+          value: value
+        }
+      } as ChangeEvent<HTMLTextAreaElement>;
+      onInputChange(event);
+    }
+  };
 
   return (
     <FormStep
@@ -26,7 +43,12 @@ export default function MedicalHistoryStep({ formData, onInputChange, onNext, on
     >
       <div className="space-y-6">
         <SubSection title={t('section.medicalConditions')}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <HealthAssistant
+            type="conditions"
+            currentValue=""
+            onSuggestionSelect={() => {}}
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <SelectField
               label={t('field.highBloodPressure')}
               name="highBloodPressure"
@@ -85,23 +107,37 @@ export default function MedicalHistoryStep({ formData, onInputChange, onNext, on
 
         <SubSection title={t('section.medications')}>
           <div className="space-y-4">
-            <TextareaField
-              label={t('field.medications')}
-              name="medications"
-              value={formData.medications}
-              onChange={onInputChange}
-              rows={3}
-              placeholder={t('placeholder.medications')}
-            />
+            <div>
+              <TextareaField
+                label={t('field.medications')}
+                name="medications"
+                value={formData.medications}
+                onChange={onInputChange}
+                rows={3}
+                placeholder={t('placeholder.medications')}
+              />
+              <HealthAssistant
+                type="medications"
+                currentValue={formData.medications}
+                onSuggestionSelect={(value) => handleAssistantSuggestion('medications', value)}
+              />
+            </div>
 
-            <TextareaField
-              label={t('field.allergies')}
-              name="allergies"
-              value={formData.allergies}
-              onChange={onInputChange}
-              rows={2}
-              placeholder={t('placeholder.allergies')}
-            />
+            <div>
+              <TextareaField
+                label={t('field.allergies')}
+                name="allergies"
+                value={formData.allergies}
+                onChange={onInputChange}
+                rows={2}
+                placeholder={t('placeholder.allergies')}
+              />
+              <HealthAssistant
+                type="allergies"
+                currentValue={formData.allergies}
+                onSuggestionSelect={(value) => handleAssistantSuggestion('allergies', value)}
+              />
+            </div>
           </div>
         </SubSection>
 
