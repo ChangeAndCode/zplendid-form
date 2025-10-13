@@ -483,10 +483,10 @@ export default function PatientInfoForm() {
               onClick={() => router.push('/')}
               variant="secondary"
             >
-              {language === 'es' ? 'Guardar y Volver' : 'Save and Return'}
+              {language === 'es' ? 'Volver' : 'Return'}
             </Button>
             <Button type="submit">
-              {language === 'es' ? 'Guardar y Continuar' : 'Save and Continue'}
+              {language === 'es' ? 'Continuar' : 'Continue'}
             </Button>
           </div>
         </form>

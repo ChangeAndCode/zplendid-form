@@ -280,7 +280,7 @@ export default function FamilyInfoForm() {
               {language === 'es' ? 'Anterior' : 'Previous'}
             </Button>
             <Button type="submit">
-              {language === 'es' ? 'Guardar y Continuar' : 'Save and Continue'}
+              {language === 'es' ? 'Continuar' : 'Continue'}
             </Button>
           </div>
         </form>
