@@ -230,8 +230,8 @@ export default function IntelligentMedicalAssistant({
             onClick={() => setIsOpen(false)}
           />
           
-          {/* Panel de chat */}
-          <div className="absolute top-10 left-0 z-20 w-96 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-xl max-h-[500px] overflow-hidden">
+          {/* Panel de chat - Responsive */}
+          <div className="absolute bottom-10 right-0 sm:absolute sm:top-10 sm:left-0 sm:right-auto sm:bottom-auto z-20 w-80 sm:w-96 bg-white border border-gray-200 rounded-lg shadow-xl max-h-[70vh] sm:max-h-[500px] overflow-hidden">
             {/* Header */}
             <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
               <div className="flex items-center justify-between">

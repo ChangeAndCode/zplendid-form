@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useLanguage } from '../../../context/LanguageContext';
 import SelectField from '../../../components/molecules/SelectField';
 import FormField from '../../../components/molecules/FormField';
@@ -350,6 +349,7 @@ export default function MedicalHistorySteps({
                 />
               </div>
               <TextareaField
+                label={language === 'es' ? 'Medicamentos Actuales' : 'Current Medications'}
                 name="medications"
                 value={formData.medications}
                 onChange={handleChange}
@@ -371,6 +371,7 @@ export default function MedicalHistorySteps({
                 />
               </div>
               <TextareaField
+                label={language === 'es' ? 'Alergias' : 'Allergies'}
                 name="allergies"
                 value={formData.allergies}
                 onChange={handleChange}

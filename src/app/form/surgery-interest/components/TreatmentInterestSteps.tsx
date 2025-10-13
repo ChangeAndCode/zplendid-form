@@ -1,10 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import { useLanguage } from '../../../context/LanguageContext';
 import SelectField from '../../../components/molecules/SelectField';
 import FormField from '../../../components/molecules/FormField';
-import TextareaField from '../../../components/molecules/TextareaField';
 import Button from '../../../components/atoms/Button';
 
 interface SurgeryInterestData {
