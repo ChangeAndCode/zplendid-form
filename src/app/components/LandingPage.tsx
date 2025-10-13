@@ -68,7 +68,6 @@ const formModules: FormModule[] = [
 
 export default function LandingPage() {
   const { language } = useLanguage();
-  const router = useRouter();
   const [patientId, setPatientId] = useState<string>('');
   const [isReturning, setIsReturning] = useState(false);
   const [completedForms, setCompletedForms] = useState<string[]>([]);
@@ -131,22 +130,22 @@ export default function LandingPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header minimalista */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-6 py-6 flex justify-between items-center">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-[#212e5c] tracking-tight">zplendid</h1>
           <LanguageSwitcher />
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-16">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
         {/* Hero Section */}
         <div className="mb-8">
-          <h2 className="text-5xl md:text-5xl font-bold text-[#212e5c] mb-6 leading-tight tracking-tight">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#212e5c] mb-6 leading-tight tracking-tight">
             {language === 'es' 
               ? 'Construyamos tu expediente juntos' 
               : 'Let\'s build your medical record together'}
           </h2>
           
-          <p className="text-xl text-gray-600 max-w-2xl mb-10 leading-relaxed">
+          <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mb-10 leading-relaxed">
             {language === 'es'
               ? 'Para brindarte la mejor consulta posible, ayúdanos a conocerte mejor. Tu información es confidencial y nos permite cuidarte de forma personalizada.'
               : 'To provide you with the best possible consultation, help us get to know you better. Your information is confidential and allows us to care for you in a personalized way.'}
@@ -185,30 +184,30 @@ export default function LandingPage() {
               href={module.route}
               className="group block w-full bg-white rounded-lg border border-gray-200 hover:border-[#212e5c] transition-all duration-200 text-left cursor-pointer"
             >
-              <div className="p-8 flex items-center justify-between">
+              <div className="p-4 sm:p-6 lg:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex-1">
-                  <div className="flex items-center gap-4 mb-3">
-                    <span className="text-3xl">{module.icon}</span>
+                  <div className="flex items-center gap-3 sm:gap-4 mb-3">
+                    <span className="text-2xl sm:text-3xl">{module.icon}</span>
                     <div>
                       <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
                         {index + 1} {language === 'es' ? 'de' : 'of'} 4
                       </div>
-                      <h4 className="text-2xl font-semibold text-[#212e5c] group-hover:text-[#1a2347] transition-colors">
+                      <h4 className="text-lg sm:text-xl lg:text-2xl font-semibold text-[#212e5c] group-hover:text-[#1a2347] transition-colors">
                         {language === 'es' ? module.title : module.titleEn}
                       </h4>
                     </div>
                   </div>
-                  <p className="text-gray-600 ml-16">
+                  <p className="text-sm sm:text-base text-gray-600 ml-8 sm:ml-16">
                     {language === 'es' ? module.description : module.descriptionEn}
                   </p>
                 </div>
                 
-                <div className="flex items-center gap-6 ml-8">
-                  <span className="text-sm text-gray-500 whitespace-nowrap">
+                <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 sm:ml-8">
+                  <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
                     {language === 'es' ? module.estimatedTime : module.estimatedTimeEn}
                   </span>
                   <svg 
-                    className="w-6 h-6 text-gray-400 group-hover:text-[#212e5c] group-hover:translate-x-1 transition-all" 
+                    className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 group-hover:text-[#212e5c] group-hover:translate-x-1 transition-all" 
                     fill="none" 
                     stroke="currentColor" 
                     viewBox="0 0 24 24"
@@ -222,21 +221,21 @@ export default function LandingPage() {
         </div>
 
         {/* Contact Section - minimalista */}
-        <div className="bg-[#212e5c] rounded-lg p-12 text-white text-center mb-16">
-          <h3 className="text-2xl font-semibold mb-8">
+        <div className="bg-[#212e5c] rounded-lg p-6 sm:p-8 lg:p-12 text-white text-center mb-16">
+          <h3 className="text-xl sm:text-2xl font-semibold mb-6 sm:mb-8">
             {language === 'es' ? '¿Necesitas asistencia?' : 'Need assistance?'}
           </h3>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
             <a 
               href="tel:+16194716097" 
-              className="text-white hover:text-gray-200 transition-colors font-medium"
+              className="text-white hover:text-gray-200 transition-colors font-medium text-sm sm:text-base"
             >
               +1 (619) 471-6097
             </a>
             <span className="hidden sm:block text-white/30">|</span>
             <a 
               href="mailto:info@zplendid.com" 
-              className="text-white hover:text-gray-200 transition-colors font-medium"
+              className="text-white hover:text-gray-200 transition-colors font-medium text-sm sm:text-base"
             >
               info@zplendid.com
             </a>

@@ -274,10 +274,10 @@ export default function FamilyInfoForm() {
           <div className="flex justify-between bg-white rounded-lg shadow-md p-6">
             <Button
               type="button"
-              onClick={() => router.push('/')}
+              onClick={() => router.push('/form/patient-info')}
               variant="secondary"
             >
-              {language === 'es' ? 'Guardar y Volver' : 'Save and Return'}
+              {language === 'es' ? 'Anterior' : 'Previous'}
             </Button>
             <Button type="submit">
               {language === 'es' ? 'Guardar y Continuar' : 'Save and Continue'}

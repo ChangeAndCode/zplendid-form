@@ -349,6 +349,7 @@ export default function MedicalHistorySteps({
                 />
               </div>
               <TextareaField
+                label=""
                 name="medications"
                 value={formData.medications}
                 onChange={handleChange}
@@ -370,6 +371,7 @@ export default function MedicalHistorySteps({
                 />
               </div>
               <TextareaField
+                label=""
                 name="allergies"
                 value={formData.allergies}
                 onChange={handleChange}
@@ -464,11 +466,13 @@ export default function MedicalHistorySteps({
         <Button
           type="button"
           onClick={onPrevious}
-          disabled={currentStep === 1}
           variant="secondary"
           className="px-6 py-3"
         >
-          {language === 'es' ? 'Anterior' : 'Previous'}
+          {currentStep === 1 
+            ? (language === 'es' ? 'Guardar y Volver' : 'Save and Return')
+            : (language === 'es' ? 'Anterior' : 'Previous')
+          }
         </Button>
         
         <Button

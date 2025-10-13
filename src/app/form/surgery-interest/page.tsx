@@ -179,6 +179,8 @@ export default function SurgeryInterestForm() {
   const handlePrevious = () => {
     if (currentStep > 1) {
       setCurrentStep(prev => prev - 1);
+    } else {
+      router.push('/form/medical-history');
     }
   };
 
