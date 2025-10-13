@@ -180,7 +180,7 @@ export default function SurgeryInterestForm() {
     if (currentStep > 1) {
       setCurrentStep(prev => prev - 1);
     } else {
-      router.push('/form/medical-history');
+      router.push('/');
     }
   };
 

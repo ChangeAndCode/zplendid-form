@@ -190,7 +190,7 @@ export default function MedicalHistoryForm() {
     if (currentStep > 1) {
       setCurrentStep(prev => prev - 1);
     } else {
-      router.push('/form/family-info');
+      router.push('/');
     }
   };
 
