@@ -21,6 +21,7 @@ export default function Button({
   return (
     <button
       className={`${baseClasses} ${variantClasses[variant]} ${className}`}
+      suppressHydrationWarning={true}
       {...props}
     >
       {children}

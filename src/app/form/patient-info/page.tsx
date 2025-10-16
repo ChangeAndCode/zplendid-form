@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '../../context/LanguageContext';
-import { getPatientId, formatPatientId, getFormStorageKey } from '../../utils/patientId';
+import { useAuth } from '../../hooks/useAuth';
+import { getFormStorageKey } from '../../utils/patientId';
 import FormField from '../../components/molecules/FormField';
 import SelectField from '../../components/molecules/SelectField';
 import Button from '../../components/atoms/Button';
@@ -39,14 +40,21 @@ interface PatientInfoData {
   weightKg: string;
   bmi: string;
   // How did you hear about us
-  howHeardAboutUs: string;
-  otherReferral: string;
+  hearAboutUs: string;
+  hearAboutUsOther: string;
+  // Insurance
+  hasInsurance: string;
+  insuranceProvider: string;
+  policyNumber: string;
+  groupNumber: string;
+  // Additional info
+  additionalInfo: string;
 }
 
 export default function PatientInfoForm() {
   const { t, language } = useLanguage();
   const router = useRouter();
-  const [patientId, setPatientId] = useState('');
+  const { patientId, isAuthenticated, isLoading, getPatientRecord } = useAuth();
   const [formData, setFormData] = useState<PatientInfoData>({
     firstName: '',
     lastName: '',
@@ -75,17 +83,21 @@ export default function PatientInfoForm() {
     weightLbs: '',
     weightKg: '',
     bmi: '',
-    howHeardAboutUs: '',
-    otherReferral: '',
+    hearAboutUs: '',
+    hearAboutUsOther: '',
+    hasInsurance: '',
+    insuranceProvider: '',
+    policyNumber: '',
+    groupNumber: '',
+    additionalInfo: '',
   });
 
   useEffect(() => {
-    const id = getPatientId();
-    setPatientId(id);
+    if (!patientId) return;
 
     // Cargar datos guardados
     try {
-      const storageKey = getFormStorageKey('patient_info', id);
+      const storageKey = getFormStorageKey('patient_info', patientId);
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         setFormData(JSON.parse(saved));
@@ -93,7 +105,7 @@ export default function PatientInfoForm() {
     } catch (error) {
       console.error('Error cargando datos:', error);
     }
-  }, []);
+  }, [patientId]);
 
   // Auto-guardar
   useEffect(() => {
@@ -153,10 +165,78 @@ export default function PatientInfoForm() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Verificar autenticación
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/');
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  // Obtener expediente del paciente cuando esté autenticado
+  useEffect(() => {
+    if (isAuthenticated && !patientId) {
+      console.log('🔍 Patient Info: No hay patientId, llamando getPatientRecord...');
+      getPatientRecord();
+    }
+  }, [isAuthenticated, patientId, getPatientRecord]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push('/');
+    
+    if (!isAuthenticated) {
+      alert(language === 'es' ? 'No estás autenticado' : 'You are not authenticated');
+      router.push('/');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      console.log('🔍 Token encontrado en localStorage:', token ? 'Sí' : 'No');
+
+      console.log('🔍 Enviando datos del formulario...');
+      const response = await fetch('/api/forms/patient-info', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      console.log('🔍 Respuesta recibida:', response.status, response.statusText);
+      const result = await response.json();
+      console.log('🔍 Resultado:', result);
+
+      if (result.success) {
+        alert(language === 'es' ? 'Formulario guardado correctamente' : 'Form saved successfully');
+        router.push('/landing');
+      } else {
+        alert(language === 'es' ? 'Error al guardar el formulario' : 'Error saving form');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert(language === 'es' ? 'Error al guardar el formulario' : 'Error saving form');
+    }
   };
+
+  // Mostrar carga mientras verifica autenticación
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#212e5c] mx-auto mb-4"></div>
+          <p className="text-gray-600">
+            {language === 'es' ? 'Cargando...' : 'Loading...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no está autenticado, no mostrar nada (se redirigirá)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -179,7 +259,7 @@ export default function PatientInfoForm() {
                 {language === 'es' ? 'Expediente' : 'Patient ID'}
               </div>
               <div className="text-lg font-bold text-[#212e5c] font-mono">
-                {formatPatientId(patientId)}
+                {patientId || 'N/A'}
               </div>
             </div>
           </div>
@@ -453,8 +533,8 @@ export default function PatientInfoForm() {
             <div className="space-y-4">
               <SelectField
                 label={language === 'es' ? '¿Cómo nos conoció?' : 'How did you hear about us?'}
-                name="howHeardAboutUs"
-                value={formData.howHeardAboutUs}
+                name="hearAboutUs"
+                value={formData.hearAboutUs}
                 onChange={handleChange}
               >
                 <option value="">{language === 'es' ? 'Seleccione...' : 'Select...'}</option>
@@ -465,14 +545,83 @@ export default function PatientInfoForm() {
                 <option value="other">{language === 'es' ? 'Otro' : 'Other'}</option>
               </SelectField>
 
-              {formData.howHeardAboutUs === 'other' && (
+              {formData.hearAboutUs === 'other' && (
                 <FormField
                   label={language === 'es' ? 'Especifique' : 'Specify'}
-                  name="otherReferral"
-                  value={formData.otherReferral}
+                  name="hearAboutUsOther"
+                  value={formData.hearAboutUsOther}
                   onChange={handleChange}
                 />
               )}
+            </div>
+          </div>
+
+          {/* Información de Seguros */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-semibold text-[#212e5c] mb-4">
+              {language === 'es' ? 'Información de Seguros' : 'Insurance Information'}
+            </h2>
+            
+            <div className="space-y-4">
+              <SelectField
+                label={language === 'es' ? '¿Tiene seguro médico?' : 'Do you have medical insurance?'}
+                name="hasInsurance"
+                value={formData.hasInsurance}
+                onChange={handleChange}
+              >
+                <option value="">{language === 'es' ? 'Seleccione...' : 'Select...'}</option>
+                <option value="yes">{language === 'es' ? 'Sí' : 'Yes'}</option>
+                <option value="no">{language === 'es' ? 'No' : 'No'}</option>
+              </SelectField>
+
+              {formData.hasInsurance === 'yes' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    label={language === 'es' ? 'Proveedor de Seguro' : 'Insurance Provider'}
+                    name="insuranceProvider"
+                    value={formData.insuranceProvider}
+                    onChange={handleChange}
+                    placeholder={language === 'es' ? 'Nombre del proveedor' : 'Provider name'}
+                  />
+                  <FormField
+                    label={language === 'es' ? 'Número de Póliza' : 'Policy Number'}
+                    name="policyNumber"
+                    value={formData.policyNumber}
+                    onChange={handleChange}
+                    placeholder={language === 'es' ? 'Número de póliza' : 'Policy number'}
+                  />
+                  <FormField
+                    label={language === 'es' ? 'Número de Grupo' : 'Group Number'}
+                    name="groupNumber"
+                    value={formData.groupNumber}
+                    onChange={handleChange}
+                    placeholder={language === 'es' ? 'Número de grupo' : 'Group number'}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Información Adicional */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-semibold text-[#212e5c] mb-4">
+              {language === 'es' ? 'Información Adicional' : 'Additional Information'}
+            </h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {language === 'es' ? 'Comentarios adicionales (opcional)' : 'Additional comments (optional)'}
+                </label>
+                <textarea
+                  name="additionalInfo"
+                  value={formData.additionalInfo}
+                  onChange={handleChange}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#212e5c] focus:border-transparent"
+                  placeholder={language === 'es' ? 'Cualquier información adicional que desee compartir...' : 'Any additional information you would like to share...'}
+                />
+              </div>
             </div>
           </div>
 

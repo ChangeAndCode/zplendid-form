@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../hooks/useAuth';
 import { getPatientId, formatPatientId, hasExistingPatientId, getFormStorageKey } from '../utils/patientId';
 import LanguageSwitcher from './organisms/LanguageSwitcher';
 import GlobalProgress from './organisms/GlobalProgress';
@@ -68,63 +69,125 @@ const formModules: FormModule[] = [
 
 export default function LandingPage() {
   const { language } = useLanguage();
-  const [patientId, setPatientId] = useState<string>('');
+  const { isAuthenticated, isLoading, logout, user, patientId, getPatientRecord } = useAuth();
+  const router = useRouter();
+  const [localPatientId, setLocalPatientId] = useState<string>('');
   const [isReturning, setIsReturning] = useState(false);
   const [completedForms, setCompletedForms] = useState<string[]>([]);
 
+  // Redirigir al login si no está autenticado
   useEffect(() => {
-    const id = getPatientId();
-    setPatientId(id);
-    setIsReturning(hasExistingPatientId());
+    if (!isLoading && !isAuthenticated) {
+      router.push('/');
+    }
+  }, [isAuthenticated, isLoading, router]);
 
-    // Verificar qué formularios tienen datos guardados
-    const completed: string[] = [];
-    const formKeys = ['patient_info', 'family_history', 'medical_history', 'surgery_interest'];
-    
-    formKeys.forEach((formKey, index) => {
+  // Obtener expediente del paciente cuando esté autenticado
+  useEffect(() => {
+    if (isAuthenticated && !patientId) {
+      getPatientRecord();
+    }
+  }, [isAuthenticated, patientId, getPatientRecord]);
+
+  // Verificar formularios completados desde la base de datos
+  useEffect(() => {
+    const checkCompletedForms = async () => {
+      if (!isAuthenticated || !patientId) return;
+
       try {
-        const storageKey = getFormStorageKey(formKey, id);
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-          const data = JSON.parse(saved);
-          let isCompleted = false;
-          
-          // Lógica específica para cada formulario
-          switch (formKey) {
-            case 'patient_info':
-              // Requiere al menos nombre, apellido y email
-              isCompleted = !!(data.firstName && data.lastName && data.email);
-              break;
-            case 'family_history':
-              // Requiere al menos 2 campos de historial familiar completados
-              const familyFields = Object.entries(data).filter(([key, value]) => 
-                key !== 'patientId' && value && value !== 'no' && value !== ''
-              );
-              isCompleted = familyFields.length >= 2;
-              break;
-            case 'medical_history':
-              // Requiere al menos medicamentos o alergias o alguna condición médica
-              isCompleted = !!(data.medications || data.allergies || 
-                (data.sleepApnea === 'yes') || (data.diabetes === 'yes') || 
-                (data.highBloodPressure === 'yes') || data.otherMedicalConditions);
-              break;
-            case 'surgery_interest':
-              // Requiere al menos el tipo de procedimiento de interés
-              isCompleted = !!data.surgeryInterest;
-              break;
-          }
-          
-          if (isCompleted) {
-            completed.push(`form-${index + 1}`);
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const completed: string[] = [];
+        
+        // Verificar cada formulario
+        const formChecks = [
+          { id: 'patient-info', url: '/api/forms/patient-info' },
+          { id: 'family-info', url: '/api/forms/family-info' },
+          { id: 'medical-history', url: '/api/forms/medical-history' },
+          { id: 'surgery-interest', url: '/api/forms/surgery-interest' }
+        ];
+
+        for (let i = 0; i < formChecks.length; i++) {
+          const form = formChecks[i];
+          try {
+            const response = await fetch(form.url, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              if (result.success && result.data) {
+                // Verificar si tiene datos válidos según el tipo de formulario
+                let isCompleted = false;
+                
+                switch (form.id) {
+                  case 'patient-info':
+                    isCompleted = !!(result.data.firstName && result.data.lastName && result.data.email);
+                    break;
+                  case 'family-info':
+                    // Verificar que al menos 2 campos no estén vacíos o en 'unknown'
+                    const familyFields = Object.entries(result.data).filter(([key, value]) => 
+                      key !== 'patientId' && value && value !== 'unknown' && value !== ''
+                    );
+                    isCompleted = familyFields.length >= 2;
+                    break;
+                  case 'medical-history':
+                    isCompleted = !!(result.data.medications || result.data.allergies || 
+                      result.data.sleepApnea === 'yes' || result.data.diabetes === 'yes' || 
+                      result.data.highBloodPressure === 'yes' || result.data.otherMedicalConditions);
+                    break;
+                  case 'surgery-interest':
+                    isCompleted = !!result.data.surgeryInterest;
+                    break;
+                }
+                
+                if (isCompleted) {
+                  completed.push(`form-${i + 1}`);
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`Error verificando formulario ${form.id}:`, error);
           }
         }
+
+        setCompletedForms(completed);
       } catch (error) {
-        console.error(`Error verificando formulario ${formKey}:`, error);
+        console.error('Error verificando formularios completados:', error);
       }
-    });
-    
-    setCompletedForms(completed);
+    };
+
+    checkCompletedForms();
+  }, [isAuthenticated, patientId]);
+
+  useEffect(() => {
+    const id = getPatientId();
+    setLocalPatientId(id);
+    setIsReturning(hasExistingPatientId());
   }, []);
+
+  // Mostrar carga mientras verifica autenticación
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#212e5c] mx-auto mb-4"></div>
+          <p className="text-gray-600">
+            {language === 'es' ? 'Cargando...' : 'Loading...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no está autenticado, no mostrar nada (se redirigirá)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -132,7 +195,15 @@ export default function LandingPage() {
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-[#212e5c] tracking-tight">zplendid</h1>
-          <LanguageSwitcher />
+          <div className="flex items-center">
+            <LanguageSwitcher />
+          </div>
+          <button
+            onClick={logout}
+            className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors"
+          >
+            {language === 'es' ? 'Cerrar Sesión' : 'Logout'}
+          </button>
         </div>
       </div>
 
@@ -152,7 +223,7 @@ export default function LandingPage() {
           </p>
 
           {/* Patient ID Badge - minimalista */}
-          {patientId && (
+          {(patientId || localPatientId) && (
             <div className="inline-flex items-center gap-4 bg-white px-6 py-4 rounded-lg border border-gray-200 mb-6">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -160,9 +231,9 @@ export default function LandingPage() {
                 </span>
               </div>
               <span className="text-xl font-mono font-bold text-[#212e5c]">
-                {formatPatientId(patientId)}
+                {patientId || formatPatientId(localPatientId)}
               </span>
-              {isReturning && (
+              {(isReturning || patientId) && (
                 <span className="text-xs bg-green-500 text-white px-3 py-1 rounded-full font-medium">
                   {language === 'es' ? 'Guardado' : 'Saved'}
                 </span>

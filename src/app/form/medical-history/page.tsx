@@ -2,8 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../hooks/useAuth';
 import { useState, useEffect } from 'react';
-import { getPatientId, formatPatientId, getFormStorageKey } from '../../utils/patientId';
 import LanguageSwitcher from '../../components/organisms/LanguageSwitcher';
 import MedicalHistorySteps from './components/MedicalHistorySteps';
 
@@ -89,10 +89,10 @@ interface MedicalHistoryData {
 
 export default function MedicalHistoryForm() {
   const { language } = useLanguage();
+  const { isAuthenticated, isLoading, patientId, getPatientRecord } = useAuth();
   const router = useRouter();
   const [isHydrated, setIsHydrated] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [patientId, setPatientId] = useState('');
   const [formData, setFormData] = useState<MedicalHistoryData>({
     sleepApnea: '',
     useCpap: '',
@@ -146,63 +146,150 @@ export default function MedicalHistoryForm() {
     hospitalizationsDetails: ''
   });
 
+  // Verificar autenticación y obtener expediente
   useEffect(() => {
-    const id = getPatientId();
-    setPatientId(id);
-
-    try {
-      const storageKey = getFormStorageKey('medical_history', id);
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        setFormData(JSON.parse(saved));
-      }
-    } catch (error) {
-      console.error('Error cargando datos:', error);
+    if (!isLoading && !isAuthenticated) {
+      router.push('/');
     }
-    
+  }, [isAuthenticated, isLoading, router]);
+
+  // Obtener expediente del paciente cuando esté autenticado
+  useEffect(() => {
+    if (isAuthenticated && !patientId) {
+      getPatientRecord();
+    }
+  }, [isAuthenticated, patientId, getPatientRecord]);
+
+  useEffect(() => {
     setIsHydrated(true);
   }, []);
 
+  // Cargar datos existentes del formulario
   useEffect(() => {
-    if (!patientId) return;
-    
-    try {
-      const storageKey = getFormStorageKey('medical_history', patientId);
-      localStorage.setItem(storageKey, JSON.stringify(formData));
-    } catch (error) {
-      console.error('Error guardando datos:', error);
-    }
-  }, [formData, patientId]);
+    const loadExistingData = async () => {
+      if (isAuthenticated && patientId) {
+        try {
+          const token = localStorage.getItem('token');
+          if (!token) return;
+
+          const response = await fetch('/api/forms/medical-history', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data) {
+              console.log('🔍 Cargando datos existentes:', result.data);
+              setFormData(result.data);
+            }
+          }
+        } catch (error) {
+          console.error('Error al cargar datos existentes:', error);
+        }
+      }
+    };
+
+    loadExistingData();
+  }, [isAuthenticated, patientId]);
+
 
   const handleFormDataChange = (field: keyof MedicalHistoryData, value: string) => {
+    console.log('🔍 Actualizando campo en medical-history:', field, 'con valor:', value);
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleNext = () => {
+  const handleSave = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      console.log('🔍 Token encontrado en localStorage:', token ? 'Sí' : 'No');
+      
+      if (!token) {
+        alert(language === 'es' ? 'No estás autenticado' : 'You are not authenticated');
+        router.push('/');
+        return;
+      }
+
+      console.log('🔍 Enviando datos del formulario de historial médico...');
+      console.log('🔍 Datos COMPLETOS del formulario ANTES de enviar:', formData);
+      console.log('🔍 Campos específicos ANTES de enviar:', {
+        sleepApnea: formData.sleepApnea,
+        diabetes: formData.diabetes,
+        highBloodPressure: formData.highBloodPressure,
+        medications: formData.medications,
+        allergies: formData.allergies,
+        tobacco: formData.tobacco,
+        alcohol: formData.alcohol
+      });
+      
+      const response = await fetch('/api/forms/medical-history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      console.log('🔍 Respuesta recibida:', response.status, response.statusText);
+      const result = await response.json();
+      console.log('🔍 Resultado:', result);
+
+      if (result.success) {
+        alert(language === 'es' ? 'Formulario guardado correctamente' : 'Form saved successfully');
+        return true;
+      } else {
+        alert(language === 'es' ? 'Error al guardar el formulario' : 'Error saving form');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert(language === 'es' ? 'Error al guardar el formulario' : 'Error saving form');
+      return false;
+    }
+  };
+
+  const handleNext = async () => {
     if (currentStep < 4) {
       setCurrentStep(prev => prev + 1);
     } else {
-      router.push('/');
+      // Envío final del formulario
+      const saved = await handleSave();
+      if (saved) {
+        router.push('/landing');
+      }
     }
   };
 
-  const handlePrevious = () => {
+  const handlePrevious = async () => {
     if (currentStep > 1) {
       setCurrentStep(prev => prev - 1);
     } else {
+      // Si estamos en el paso 1, guardar y salir
+      await handleSave();
       router.push('/');
     }
   };
 
-  if (!isHydrated) {
+  // Mostrar carga mientras verifica autenticación
+  if (isLoading || !isHydrated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#212e5c] mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando formulario...</p>
+          <p className="text-gray-600">
+            {language === 'es' ? 'Cargando...' : 'Loading...'}
+          </p>
         </div>
       </div>
     );
+  }
+
+  // Si no está autenticado, no mostrar nada (se redirigirá)
+  if (!isAuthenticated) {
+    return null;
   }
 
   return (
@@ -226,7 +313,7 @@ export default function MedicalHistoryForm() {
                 {language === 'es' ? 'Expediente' : 'Patient ID'}
               </div>
               <div className="text-lg font-bold text-[#212e5c] font-mono">
-                {formatPatientId(patientId)}
+                {patientId || 'Cargando...'}
               </div>
             </div>
           </div>
