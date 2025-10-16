@@ -108,6 +108,7 @@ export default function MedicalHistorySteps({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    console.log('🔍 Campo cambiado en medical-history:', name, 'Valor:', value);
     onFormDataChange(name as keyof MedicalHistoryData, value);
   };
 

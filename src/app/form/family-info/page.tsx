@@ -2,8 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../hooks/useAuth';
 import { useState, useEffect } from 'react';
-import { getPatientId, formatPatientId, getFormStorageKey } from '../../utils/patientId';
 import Button from '../../components/atoms/Button';
 import SelectField from '../../components/molecules/SelectField';
 import LanguageSwitcher from '../../components/organisms/LanguageSwitcher';
@@ -26,8 +26,8 @@ interface FamilyHistoryData {
 
 export default function FamilyInfoForm() {
   const { language } = useLanguage();
+  const { isAuthenticated, isLoading, patientId, getPatientRecord } = useAuth();
   const router = useRouter();
-  const [patientId, setPatientId] = useState('');
   const [formData, setFormData] = useState<FamilyHistoryData>({
     heartDisease: '',
     pulmonaryEdema: '',
@@ -44,43 +44,114 @@ export default function FamilyInfoForm() {
     otherFamilyConditions: '',
   });
 
-  useEffect(() => {
-    const id = getPatientId();
-    setPatientId(id);
 
-    // Cargar datos guardados
-    try {
-      const storageKey = getFormStorageKey('family_history', id);
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        setFormData(JSON.parse(saved));
+  // Verificar autenticación y obtener expediente
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/');
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  // Obtener expediente del paciente cuando esté autenticado
+  useEffect(() => {
+    if (isAuthenticated && !patientId) {
+      getPatientRecord();
+    }
+  }, [isAuthenticated, patientId, getPatientRecord]);
+
+  // Cargar datos existentes del formulario
+  useEffect(() => {
+    const loadExistingData = async () => {
+      if (isAuthenticated && patientId) {
+        try {
+          const token = localStorage.getItem('token');
+          if (!token) return;
+
+          const response = await fetch('/api/forms/family-info', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data) {
+              console.log('🔍 Cargando datos existentes:', result.data);
+              setFormData(result.data);
+            }
+          }
+        } catch (error) {
+          console.error('Error al cargar datos existentes:', error);
+        }
       }
-    } catch (error) {
-      console.error('Error cargando datos:', error);
-    }
-  }, []);
+    };
 
-  // Auto-guardar
-  useEffect(() => {
-    if (!patientId) return;
-    
-    try {
-      const storageKey = getFormStorageKey('family_history', patientId);
-      localStorage.setItem(storageKey, JSON.stringify(formData));
-    } catch (error) {
-      console.error('Error guardando datos:', error);
-    }
-  }, [formData, patientId]);
+    loadExistingData();
+  }, [isAuthenticated, patientId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push('/');
+    
+    try {
+      const token = localStorage.getItem('token');
+      console.log('🔍 Token encontrado en localStorage:', token ? 'Sí' : 'No');
+      
+      if (!token) {
+        alert(language === 'es' ? 'No estás autenticado' : 'You are not authenticated');
+        router.push('/');
+        return;
+      }
+
+      console.log('🔍 Enviando datos del formulario de historial familiar...');
+      const response = await fetch('/api/forms/family-info', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      console.log('🔍 Respuesta recibida:', response.status, response.statusText);
+      const result = await response.json();
+      console.log('🔍 Resultado:', result);
+
+      if (result.success) {
+        alert(language === 'es' ? 'Formulario guardado correctamente' : 'Form saved successfully');
+        router.push('/landing');
+      } else {
+        alert(language === 'es' ? 'Error al guardar el formulario' : 'Error saving form');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert(language === 'es' ? 'Error al guardar el formulario' : 'Error saving form');
+    }
   };
+
+  // Mostrar carga mientras verifica autenticación
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#212e5c] mx-auto mb-4"></div>
+          <p className="text-gray-600">
+            {language === 'es' ? 'Cargando...' : 'Loading...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no está autenticado, no mostrar nada (se redirigirá)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -103,7 +174,7 @@ export default function FamilyInfoForm() {
                 {language === 'es' ? 'Expediente' : 'Patient ID'}
               </div>
               <div className="text-lg font-bold text-[#212e5c] font-mono">
-                {formatPatientId(patientId)}
+                {patientId || 'Cargando...'}
               </div>
             </div>
           </div>
@@ -274,10 +345,10 @@ export default function FamilyInfoForm() {
           <div className="flex justify-between bg-white rounded-lg shadow-md p-6">
             <Button
               type="button"
-              onClick={() => router.push('/form/patient-info')}
+              onClick={() => router.push('/landing')}
               variant="secondary"
             >
-              {language === 'es' ? 'Anterior' : 'Previous'}
+              {language === 'es' ? 'Regresar' : 'Return'}
             </Button>
             <Button type="submit">
               {language === 'es' ? 'Continuar' : 'Continue'}

@@ -1,7 +1,7 @@
-import LandingPage from './components/LandingPage';
+import AuthLandingPage from './components/AuthLandingPage';
 
 export default function Home() {
   return (
-    <LandingPage />
+    <AuthLandingPage />
   );
 }
