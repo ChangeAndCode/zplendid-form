@@ -119,6 +119,5 @@ export class PatientRecordModel {
     `;
 
     await connection.execute(createTableQuery);
-    console.log('✅ Tabla de expedientes de pacientes creada/verificada correctamente');
   }
 }

@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useState, useEffect } from 'react';
 import LanguageSwitcher from '../../components/organisms/LanguageSwitcher';
 import MedicalHistorySteps from './components/MedicalHistorySteps';
+import StepNumber from '../../components/atoms/StepNumber';
 
 interface MedicalHistoryData {
   // Past Medical History
@@ -24,13 +25,19 @@ interface MedicalHistoryData {
   
   // Respiratory
   respiratoryProblems: string;
+  respiratoryProblemsDetails: string;
   
   // Other Systems
   urinaryConditions: string;
+  urinaryConditionsDetails: string;
   muscularConditions: string;
+  muscularConditionsDetails: string;
   neurologicalConditions: string;
+  neurologicalConditionsDetails: string;
   bloodDisorders: string;
+  bloodDisordersDetails: string;
   endocrineCondition: string;
+  endocrineConditionDetails: string;
   gastrointestinalConditions: string;
   headNeckConditions: string;
   skinConditions: string;
@@ -103,11 +110,17 @@ export default function MedicalHistoryForm() {
     highBloodPressure: '',
     heartProblems: '',
     respiratoryProblems: '',
+    respiratoryProblemsDetails: '',
     urinaryConditions: '',
+    urinaryConditionsDetails: '',
     muscularConditions: '',
+    muscularConditionsDetails: '',
     neurologicalConditions: '',
+    neurologicalConditionsDetails: '',
     bloodDisorders: '',
+    bloodDisordersDetails: '',
     endocrineCondition: '',
+    endocrineConditionDetails: '',
     gastrointestinalConditions: '',
     headNeckConditions: '',
     skinConditions: '',
@@ -182,7 +195,6 @@ export default function MedicalHistoryForm() {
           if (response.ok) {
             const result = await response.json();
             if (result.success && result.data) {
-              console.log('🔍 Cargando datos existentes:', result.data);
               setFormData(result.data);
             }
           }
@@ -197,32 +209,17 @@ export default function MedicalHistoryForm() {
 
 
   const handleFormDataChange = (field: keyof MedicalHistoryData, value: string) => {
-    console.log('🔍 Actualizando campo en medical-history:', field, 'con valor:', value);
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
     try {
-      const token = localStorage.getItem('token');
-      console.log('🔍 Token encontrado en localStorage:', token ? 'Sí' : 'No');
-      
+      const token = localStorage.getItem('token')
       if (!token) {
         alert(language === 'es' ? 'No estás autenticado' : 'You are not authenticated');
         router.push('/');
         return;
       }
-
-      console.log('🔍 Enviando datos del formulario de historial médico...');
-      console.log('🔍 Datos COMPLETOS del formulario ANTES de enviar:', formData);
-      console.log('🔍 Campos específicos ANTES de enviar:', {
-        sleepApnea: formData.sleepApnea,
-        diabetes: formData.diabetes,
-        highBloodPressure: formData.highBloodPressure,
-        medications: formData.medications,
-        allergies: formData.allergies,
-        tobacco: formData.tobacco,
-        alcohol: formData.alcohol
-      });
       
       const response = await fetch('/api/forms/medical-history', {
         method: 'POST',
@@ -233,9 +230,7 @@ export default function MedicalHistoryForm() {
         body: JSON.stringify(formData)
       });
 
-      console.log('🔍 Respuesta recibida:', response.status, response.statusText);
       const result = await response.json();
-      console.log('🔍 Resultado:', result);
 
       if (result.success) {
         alert(language === 'es' ? 'Formulario guardado correctamente' : 'Form saved successfully');
@@ -300,13 +295,21 @@ export default function MedicalHistoryForm() {
         {/* Header */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-[#212e5c] mb-2">
-                {language === 'es' ? 'Historial Clínico' : 'Medical History'}
-              </h1>
-              <p className="text-gray-600">
-                {language === 'es' ? 'Módulo 3 de 4' : 'Module 3 of 4'}
-              </p>
+            <div className="flex items-center gap-6">
+              <StepNumber 
+                stepNumber={3}
+                totalSteps={4}
+                isActive={true}
+                className="flex-shrink-0"
+              />
+              <div>
+                <h1 className="text-3xl font-bold text-[#212e5c] mb-2">
+                  {language === 'es' ? 'Historial Clínico' : 'Medical History'}
+                </h1>
+                <p className="text-gray-600">
+                  {language === 'es' ? 'Módulo 3 de 4' : 'Module 3 of 4'}
+                </p>
+              </div>
             </div>
             <div className="text-right">
               <div className="text-sm text-gray-500 mb-1">

@@ -8,9 +8,11 @@ interface GlobalProgressProps {
 }
 
 const formNames = {
-  es: ['Paciente', 'Familia', 'Clínico', 'Cirugía'],
-  en: ['Patient', 'Family', 'Medical', 'Surgery']
+  es: ['Paciente', 'Cirugía', 'Clínico', 'Familia'],
+  en: ['Patient', 'Surgery', 'Medical', 'Family']
 };
+
+const formIds = ['patient-info', 'surgery-interest', 'medical-history', 'family-info'];
 
 export default function GlobalProgress({ completedForms, totalForms }: GlobalProgressProps) {
   const { language } = useLanguage();
@@ -43,13 +45,13 @@ export default function GlobalProgress({ completedForms, totalForms }: GlobalPro
           <div
             key={index}
             className={`p-3 rounded-lg border-2 text-center transition-all ${
-              completedForms.includes(`form-${index + 1}`)
+              completedForms.includes(formIds[index])
                 ? 'border-green-500 bg-green-50'
                 : 'border-gray-200 bg-white'
             }`}
           >
             <div className="text-2xl mb-1">
-              {completedForms.includes(`form-${index + 1}`) ? '✓' : (index + 1)}
+              {completedForms.includes(formIds[index]) ? '✓' : (index + 1)}
             </div>
             <div className="text-xs font-medium text-gray-600">
               {names[index]}

@@ -10,8 +10,6 @@ dotenv.config({ path: '.env.local' });
  */
 async function main() {
   try {
-    console.log('🚀 Iniciando configuración de la base de datos...');
-    
     // Verificar conexión
     const isConnected = await checkDatabaseConnection();
     if (!isConnected) {
@@ -21,9 +19,6 @@ async function main() {
     
     // Inicializar tablas
     await initializeDatabase();
-    
-    console.log('🎉 Base de datos configurada exitosamente!');
-    console.log('📝 Puedes crear un usuario administrador usando la API de registro.');
     
   } catch (error) {
     console.error('❌ Error durante la inicialización:', error);

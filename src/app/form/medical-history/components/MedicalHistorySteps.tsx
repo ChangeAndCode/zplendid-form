@@ -24,13 +24,19 @@ interface MedicalHistoryData {
   
   // Respiratory
   respiratoryProblems: string;
+  respiratoryProblemsDetails: string;
   
   // Other Systems
   urinaryConditions: string;
+  urinaryConditionsDetails: string;
   muscularConditions: string;
+  muscularConditionsDetails: string;
   neurologicalConditions: string;
+  neurologicalConditionsDetails: string;
   bloodDisorders: string;
+  bloodDisordersDetails: string;
   endocrineCondition: string;
+  endocrineConditionDetails: string;
   gastrointestinalConditions: string;
   headNeckConditions: string;
   skinConditions: string;
@@ -108,7 +114,6 @@ export default function MedicalHistorySteps({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    console.log('🔍 Campo cambiado en medical-history:', name, 'Valor:', value);
     onFormDataChange(name as keyof MedicalHistoryData, value);
   };
 
@@ -228,6 +233,17 @@ export default function MedicalHistorySteps({
               <option value="other">{language === 'es' ? 'Otro' : 'Other'}</option>
             </SelectField>
 
+            {formData.respiratoryProblems === 'other' && (
+              <TextareaField
+                label={language === 'es' ? 'Detalles de Problemas Respiratorios' : 'Respiratory Problems Details'}
+                name="respiratoryProblemsDetails"
+                value={formData.respiratoryProblemsDetails}
+                onChange={handleChange}
+                rows={3}
+                placeholder={language === 'es' ? 'Describa los problemas respiratorios...' : 'Describe the respiratory problems...'}
+              />
+            )}
+
             <SelectField
               label={language === 'es' ? 'Condiciones Urinarias' : 'Urinary Conditions'}
               name="urinaryConditions"
@@ -240,6 +256,17 @@ export default function MedicalHistorySteps({
               <option value="incontinence">{language === 'es' ? 'Incontinencia' : 'Incontinence'}</option>
               <option value="other">{language === 'es' ? 'Otro' : 'Other'}</option>
             </SelectField>
+
+            {formData.urinaryConditions === 'other' && (
+              <TextareaField
+                label={language === 'es' ? 'Detalles de Condiciones Urinarias' : 'Urinary Conditions Details'}
+                name="urinaryConditionsDetails"
+                value={formData.urinaryConditionsDetails}
+                onChange={handleChange}
+                rows={3}
+                placeholder={language === 'es' ? 'Describa las condiciones urinarias...' : 'Describe the urinary conditions...'}
+              />
+            )}
 
             <SelectField
               label={language === 'es' ? 'Condiciones Musculares' : 'Muscular Conditions'}
@@ -254,6 +281,17 @@ export default function MedicalHistorySteps({
               <option value="other">{language === 'es' ? 'Otro' : 'Other'}</option>
             </SelectField>
 
+            {formData.muscularConditions === 'other' && (
+              <TextareaField
+                label={language === 'es' ? 'Detalles de Condiciones Musculares' : 'Muscular Conditions Details'}
+                name="muscularConditionsDetails"
+                value={formData.muscularConditionsDetails}
+                onChange={handleChange}
+                rows={3}
+                placeholder={language === 'es' ? 'Describa las condiciones musculares...' : 'Describe the muscular conditions...'}
+              />
+            )}
+
             <SelectField
               label={language === 'es' ? 'Condiciones Neurológicas' : 'Neurological Conditions'}
               name="neurologicalConditions"
@@ -266,6 +304,17 @@ export default function MedicalHistorySteps({
               <option value="epilepsy">{language === 'es' ? 'Epilepsia' : 'Epilepsy'}</option>
               <option value="other">{language === 'es' ? 'Otro' : 'Other'}</option>
             </SelectField>
+
+            {formData.neurologicalConditions === 'other' && (
+              <TextareaField
+                label={language === 'es' ? 'Detalles de Condiciones Neurológicas' : 'Neurological Conditions Details'}
+                name="neurologicalConditionsDetails"
+                value={formData.neurologicalConditionsDetails}
+                onChange={handleChange}
+                rows={3}
+                placeholder={language === 'es' ? 'Describa las condiciones neurológicas...' : 'Describe the neurological conditions...'}
+              />
+            )}
 
             <SelectField
               label={language === 'es' ? 'Trastornos Sanguíneos' : 'Blood Disorders'}
@@ -280,6 +329,17 @@ export default function MedicalHistorySteps({
               <option value="other">{language === 'es' ? 'Otro' : 'Other'}</option>
             </SelectField>
 
+            {formData.bloodDisorders === 'other' && (
+              <TextareaField
+                label={language === 'es' ? 'Detalles de Trastornos Sanguíneos' : 'Blood Disorders Details'}
+                name="bloodDisordersDetails"
+                value={formData.bloodDisordersDetails}
+                onChange={handleChange}
+                rows={3}
+                placeholder={language === 'es' ? 'Describa los trastornos sanguíneos...' : 'Describe the blood disorders...'}
+              />
+            )}
+
             <SelectField
               label={language === 'es' ? 'Condición Endocrina' : 'Endocrine Condition'}
               name="endocrineCondition"
@@ -291,6 +351,17 @@ export default function MedicalHistorySteps({
               <option value="thyroid">{language === 'es' ? 'Problemas de tiroides' : 'Thyroid problems'}</option>
               <option value="other">{language === 'es' ? 'Otro' : 'Other'}</option>
             </SelectField>
+
+            {formData.endocrineCondition === 'other' && (
+              <TextareaField
+                label={language === 'es' ? 'Detalles de Condición Endocrina' : 'Endocrine Condition Details'}
+                name="endocrineConditionDetails"
+                value={formData.endocrineConditionDetails}
+                onChange={handleChange}
+                rows={3}
+                placeholder={language === 'es' ? 'Describa la condición endocrina...' : 'Describe the endocrine condition...'}
+              />
+            )}
           </div>
         );
 

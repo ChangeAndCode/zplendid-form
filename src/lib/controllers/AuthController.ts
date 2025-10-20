@@ -36,8 +36,6 @@ export class AuthController {
       // Generar y crear expediente de paciente automáticamente
       const patientId = await PatientRecordModel.generateUniquePatientId();
       await PatientRecordModel.create(newUser.id, patientId);
-      
-      console.log(`✅ Usuario registrado con expediente: ${patientId}`);
 
       // Generar token
       const token = JWTUtils.generateToken({ 
@@ -84,34 +82,24 @@ export class AuthController {
       const body = await request.json();
       const { email, password }: UserLogin = body;
 
-      console.log('🔍 Intentando login para email:', email);
-
       if (!email || !password) {
-        console.log('❌ Faltan credenciales');
         return NextResponse.json(
           { success: false, message: 'Email y contraseña son obligatorios' },
           { status: 400 }
         );
       }
 
-      console.log('🔍 Buscando usuario en la base de datos...');
       const user = await UserModel.findByEmail(email);
-      console.log('👤 Usuario encontrado:', user ? 'Sí' : 'No');
 
       if (!user) {
-        console.log('❌ Usuario no encontrado');
         return NextResponse.json(
           { success: false, message: 'Credenciales inválidas' },
           { status: 401 }
         );
       }
-
-      console.log('🔍 Verificando contraseña...');
       const isValidPassword = await UserModel.verifyPassword(password, user.password);
-      console.log('🔐 Contraseña válida:', isValidPassword);
 
       if (!isValidPassword) {
-        console.log('❌ Contraseña incorrecta');
         return NextResponse.json(
           { success: false, message: 'Credenciales inválidas' },
           { status: 401 }
@@ -119,9 +107,7 @@ export class AuthController {
       }
 
       await UserModel.updateLastAccess(user.id);
-      console.log('🎉 Login exitoso, generando token...');
       const token = JWTUtils.generateToken({ userId: user.id, email: user.email, role: user.role });
-      console.log('✅ Token generado correctamente');
 
       // Obtener o crear expediente del paciente
       let patientRecord = await PatientRecordModel.findByUserId(user.id);
@@ -129,7 +115,6 @@ export class AuthController {
         // Si no existe, crear uno nuevo
         const patientId = await PatientRecordModel.generateUniquePatientId();
         patientRecord = await PatientRecordModel.create(user.id, patientId);
-        console.log(`✅ Expediente creado para usuario existente: ${patientId}`);
       }
 
       const userResponse = { 

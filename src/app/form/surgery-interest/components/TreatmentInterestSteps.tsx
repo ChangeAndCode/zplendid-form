@@ -93,7 +93,6 @@ export default function TreatmentInterestSteps({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    console.log('🔍 Campo cambiado:', name, 'Valor:', value);
     onFormDataChange(name as keyof SurgeryInterestData, value);
   };
 

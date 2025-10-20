@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PatientRecordModel } from '../../../../lib/models/PatientRecord';
 import { getConnection } from '../../../../lib/config/database';
 import { JWTUtils } from '../../../../lib/utils/jwt';
+import { AutoSchema } from '../../../../lib/utils/autoSchema';
 
 interface FamilyHistoryData {
   heartDisease: string;
@@ -73,37 +74,31 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const data = familyData[0] as {
-      heartDisease: string;
-      pulmonaryEdema: string;
-      diabetesMellitus: string;
-      highBloodPressure: string;
-      alcoholism: string;
-      liverProblems: string;
-      lungProblems: string;
-      bleedingDisorder: string;
-      gallstones: string;
-      mentalIllness: string;
-      malignantHyperthermia: string;
-      cancer: string;
-      otherFamilyConditions: string;
+    // Tipo para los datos de la base de datos (incluye todos los campos posibles)
+    type FamilyHistoryDBData = Record<string, string | null | undefined>;
+    const data = familyData[0] as FamilyHistoryDBData;
+
+    // Función para mapear valores de la base de datos al formulario
+    const mapFormValue = (value: string | null | undefined): string => {
+      if (!value || value === 'unknown') return '';
+      return value;
     };
-    
-    // Mapear los datos de la base de datos al formato del formulario
-    const formData = {
-      heartDisease: data.heartDisease || '',
-      pulmonaryEdema: data.pulmonaryEdema || '',
-      diabetesMellitus: data.diabetesMellitus || '',
-      highBloodPressure: data.highBloodPressure || '',
-      alcoholism: data.alcoholism || '',
-      liverProblems: data.liverProblems || '',
-      lungProblems: data.lungProblems || '',
-      bleedingDisorder: data.bleedingDisorder || '',
-      gallstones: data.gallstones || '',
-      mentalIllness: data.mentalIllness || '',
-      malignantHyperthermia: data.malignantHyperthermia || '',
-      cancer: data.cancer || '',
-      otherFamilyConditions: data.otherFamilyConditions || ''
+
+    // Mapear DINÁMICAMENTE todos los campos de la base de datos al formato del formulario
+    const formData: FamilyHistoryData = {
+      heartDisease: mapFormValue(data.heartDisease),
+      pulmonaryEdema: mapFormValue(data.pulmonaryEdema),
+      diabetesMellitus: mapFormValue(data.diabetesMellitus),
+      highBloodPressure: mapFormValue(data.highBloodPressure),
+      alcoholism: mapFormValue(data.alcoholism),
+      liverProblems: mapFormValue(data.liverProblems),
+      lungProblems: mapFormValue(data.lungProblems),
+      bleedingDisorder: mapFormValue(data.bleedingDisorder),
+      gallstones: mapFormValue(data.gallstones),
+      mentalIllness: mapFormValue(data.mentalIllness),
+      malignantHyperthermia: mapFormValue(data.malignantHyperthermia),
+      cancer: mapFormValue(data.cancer),
+      otherFamilyConditions: mapFormValue(data.otherFamilyConditions)
     };
 
     return NextResponse.json({
@@ -123,10 +118,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔍 Recibiendo petición para guardar formulario de historial familiar...');
+    // Asegurar que todas las columnas necesarias existan (comportamiento tipo Excel)
+    await AutoSchema.ensureFamilyHistoryColumns();
     
-        const authHeader = request.headers.get('authorization');
-        const token = JWTUtils.extractTokenFromHeader(authHeader || undefined);
+    const authHeader = request.headers.get('authorization');
+    const token = JWTUtils.extractTokenFromHeader(authHeader || undefined);
 
     if (!token) {
       return NextResponse.json(
@@ -169,24 +165,23 @@ export async function POST(request: NextRequest) {
         }
 
     // Guardar los datos del formulario en la tabla específica
-    console.log('🔍 Guardando datos de historial familiar...');
-    
-    // Los datos del formulario ya están en el formato correcto
-    const formDataToSave = {
-      heartDisease: formData.heartDisease || 'unknown',
-      pulmonaryEdema: formData.pulmonaryEdema || 'unknown',
-      diabetesMellitus: formData.diabetesMellitus || 'unknown',
-      highBloodPressure: formData.highBloodPressure || 'unknown',
-      alcoholism: formData.alcoholism || 'unknown',
-      liverProblems: formData.liverProblems || 'unknown',
-      lungProblems: formData.lungProblems || 'unknown',
-      bleedingDisorder: formData.bleedingDisorder || 'unknown',
-      gallstones: formData.gallstones || 'unknown',
-      mentalIllness: formData.mentalIllness || 'unknown',
-      malignantHyperthermia: formData.malignantHyperthermia || 'unknown',
-      cancer: formData.cancer || 'unknown',
-      otherFamilyConditions: formData.otherFamilyConditions || ''
+    // Función para asegurar que todos los valores sean strings
+    const mapStringValue = (value: string): string => {
+      // Si está vacío, undefined, null, o no es string, devolver string vacío
+      if (!value || value === '' || value === 'undefined' || value === 'null') {
+        return '';
+      }
+      // Devolver el valor como string
+      return String(value);
     };
+
+    // Mapear DINÁMICAMENTE todos los campos del formulario
+    const mappedData: Record<string, string> = {};
+    
+    // Mapear todos los campos del formulario automáticamente
+    Object.keys(formData).forEach(key => {
+      mappedData[key] = mapStringValue(formData[key as keyof FamilyHistoryData]);
+    });
     
     // Verificar si ya existe un registro para este paciente
     const [existing] = await connection.execute(
@@ -194,43 +189,24 @@ export async function POST(request: NextRequest) {
       [medicalRecordId]
     );
 
+    // Crear consultas SQL dinámicamente
+    const fields = Object.keys(mappedData);
+    const placeholders = fields.map(() => '?').join(', ');
+    const setClause = fields.map(field => `${field} = ?`).join(', ');
+    const values = fields.map(field => mappedData[field]);
+
     if (Array.isArray(existing) && existing.length > 0) {
       // Actualizar registro existente
       await connection.execute(
-        `UPDATE family_history SET 
-         heartDisease = ?, pulmonaryEdema = ?, diabetesMellitus = ?, 
-         highBloodPressure = ?, alcoholism = ?, liverProblems = ?, 
-         lungProblems = ?, bleedingDisorder = ?, gallstones = ?, 
-         mentalIllness = ?, malignantHyperthermia = ?, cancer = ?, 
-         otherFamilyConditions = ?, updatedAt = NOW() 
-         WHERE medicalRecordId = ?`,
-        [
-          formDataToSave.heartDisease, formDataToSave.pulmonaryEdema, formDataToSave.diabetesMellitus,
-          formDataToSave.highBloodPressure, formDataToSave.alcoholism, formDataToSave.liverProblems,
-          formDataToSave.lungProblems, formDataToSave.bleedingDisorder, formDataToSave.gallstones,
-          formDataToSave.mentalIllness, formDataToSave.malignantHyperthermia, formDataToSave.cancer,
-          formDataToSave.otherFamilyConditions, medicalRecordId
-        ]
+        `UPDATE family_history SET ${setClause}, updatedAt = NOW() WHERE medicalRecordId = ?`,
+        [...values, medicalRecordId]
       );
-      console.log(`✅ Datos de historial familiar actualizados para paciente ${patientRecord.patientId}`);
     } else {
       // Crear nuevo registro
       await connection.execute(
-        `INSERT INTO family_history 
-         (medicalRecordId, heartDisease, pulmonaryEdema, diabetesMellitus, 
-          highBloodPressure, alcoholism, liverProblems, lungProblems, 
-          bleedingDisorder, gallstones, mentalIllness, malignantHyperthermia, 
-          cancer, otherFamilyConditions, createdAt, updatedAt) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [
-          medicalRecordId, formDataToSave.heartDisease, formDataToSave.pulmonaryEdema, formDataToSave.diabetesMellitus,
-          formDataToSave.highBloodPressure, formDataToSave.alcoholism, formDataToSave.liverProblems,
-          formDataToSave.lungProblems, formDataToSave.bleedingDisorder, formDataToSave.gallstones,
-          formDataToSave.mentalIllness, formDataToSave.malignantHyperthermia, formDataToSave.cancer,
-          formDataToSave.otherFamilyConditions
-        ]
+        `INSERT INTO family_history (medicalRecordId, ${fields.join(', ')}) VALUES (?, ${placeholders})`,
+        [medicalRecordId, ...values]
       );
-      console.log(`✅ Datos de historial familiar guardados para paciente ${patientRecord.patientId}`);
     }
 
     return NextResponse.json({
