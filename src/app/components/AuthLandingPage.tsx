@@ -23,18 +23,13 @@ export default function AuthLandingPage() {
 
   // Redirigir si ya está autenticado
   useEffect(() => {
-    console.log('🔍 useEffect redirección - isAuthenticated:', isAuthenticated, 'user:', !!user);
     if (isAuthenticated && user) {
-      console.log('🔄 Redirigiendo usuario autenticado:', user.role);
       // Redirigir según el rol del usuario
       if (user.role === 'admin') {
-        console.log('🔄 Redirigiendo a admin dashboard');
         router.push('/admin/dashboard');
       } else if (user.role === 'doctor') {
-        console.log('🔄 Redirigiendo a doctor dashboard');
         router.push('/doctor/dashboard');
       } else {
-        console.log('🔄 Redirigiendo a landing page con formularios');
         router.push('/landing');
       }
     }

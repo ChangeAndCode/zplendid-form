@@ -28,7 +28,6 @@ export class PatientFormDataModel {
         );
       `;
       await connection.execute(query);
-      console.log('✅ Tabla de datos de formularios creada/verificada correctamente');
     } catch (error) {
       console.error('❌ Error al crear la tabla de datos de formularios:', error);
       throw error;
@@ -53,14 +52,12 @@ export class PatientFormDataModel {
           'UPDATE patient_form_data SET formData = ?, updatedAt = NOW() WHERE patientId = ? AND formType = ?',
           [JSON.stringify(formData), patientId, formType]
         );
-        console.log(`✅ Datos del formulario ${formType} actualizados para paciente ${patientId}`);
       } else {
         // Crear nuevo registro
         await connection.execute(
           'INSERT INTO patient_form_data (patientId, formType, formData) VALUES (?, ?, ?)',
           [patientId, formType, JSON.stringify(formData)]
         );
-        console.log(`✅ Datos del formulario ${formType} guardados para paciente ${patientId}`);
       }
 
       return { patientId, formType, formData: JSON.stringify(formData) };

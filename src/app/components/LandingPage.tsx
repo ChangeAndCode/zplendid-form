@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { getPatientId, formatPatientId, hasExistingPatientId } from '../utils/patientId';
 import LanguageSwitcher from './organisms/LanguageSwitcher';
 import GlobalProgress from './organisms/GlobalProgress';
+import StepNumber from './atoms/StepNumber';
 
 interface FormModule {
   id: string;
@@ -33,15 +34,15 @@ const formModules: FormModule[] = [
     estimatedTimeEn: '3-5 min'
   },
   {
-    id: 'family-info',
-    title: 'Información de la Familia',
-    titleEn: 'Family Information',
-    description: 'Historial familiar y contactos de emergencia',
-    descriptionEn: 'Family history and emergency contacts',
-    icon: '👨‍👩‍👧‍👦',
-    route: '/form/family-info',
-    estimatedTime: '2-3 min',
-    estimatedTimeEn: '2-3 min'
+    id: 'surgery-interest',
+    title: 'Tratamiento de Interés',
+    titleEn: 'Treatment Interest',
+    description: 'Procedimiento deseado y objetivos de salud',
+    descriptionEn: 'Desired procedure and health goals',
+    icon: '⚕️',
+    route: '/form/surgery-interest',
+    estimatedTime: '10-15 min',
+    estimatedTimeEn: '10-15 min'
   },
   {
     id: 'medical-history',
@@ -55,15 +56,15 @@ const formModules: FormModule[] = [
     estimatedTimeEn: '8-12 min'
   },
   {
-    id: 'surgery-interest',
-    title: 'Tratamiento de Interés',
-    titleEn: 'Treatment Interest',
-    description: 'Procedimiento deseado y objetivos de salud',
-    descriptionEn: 'Desired procedure and health goals',
-    icon: '⚕️',
-    route: '/form/surgery-interest',
-    estimatedTime: '10-15 min',
-    estimatedTimeEn: '10-15 min'
+    id: 'family-info',
+    title: 'Información de la Familia',
+    titleEn: 'Family Information',
+    description: 'Historial familiar y contactos de emergencia',
+    descriptionEn: 'Family history and emergency contacts',
+    icon: '👨‍👩‍👧‍👦',
+    route: '/form/family-info',
+    estimatedTime: '2-3 min',
+    estimatedTimeEn: '2-3 min'
   }
 ];
 
@@ -141,12 +142,18 @@ export default function LandingPage() {
                       result.data.highBloodPressure === 'yes' || result.data.otherMedicalConditions);
                     break;
                   case 'surgery-interest':
-                    isCompleted = !!result.data.surgeryInterest;
+                    // Verificar que al menos algunos campos importantes no estén vacíos
+                    const surgeryFields = Object.entries(result.data).filter(([key, value]) => 
+                      value && value !== 'unknown' && value !== '' && 
+                      (key === 'surgeryInterest' || key === 'previousWeightLossSurgery' || 
+                       key === 'consultedAboutWeightLoss' || key === 'surgeryReadiness')
+                    );
+                    isCompleted = surgeryFields.length >= 1;
                     break;
                 }
                 
                 if (isCompleted) {
-                  completed.push(`form-${i + 1}`);
+                  completed.push(form.id);
                 }
               }
             }
@@ -257,20 +264,22 @@ export default function LandingPage() {
             >
               <div className="p-4 sm:p-6 lg:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 sm:gap-4 mb-3">
-                    <span className="text-2xl sm:text-3xl">{module.icon}</span>
-                    <div>
-                      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                        {index + 1} {language === 'es' ? 'de' : 'of'} 4
-                      </div>
-                      <h4 className="text-lg sm:text-xl lg:text-2xl font-semibold text-[#212e5c] group-hover:text-[#1a2347] transition-colors">
+                  <div className="flex items-center gap-3 sm:gap-6 mb-3">
+                    <StepNumber 
+                      stepNumber={index + 1}
+                      totalSteps={4}
+                      isActive={completedForms.includes(module.id)}
+                      className="flex-shrink-0"
+                    />
+                    <div className="flex-1">
+                      <h4 className="text-lg sm:text-xl lg:text-2xl font-semibold text-[#212e5c] group-hover:text-[#1a2347] transition-colors mb-2">
                         {language === 'es' ? module.title : module.titleEn}
                       </h4>
+                      <p className="text-sm sm:text-base text-gray-600">
+                        {language === 'es' ? module.description : module.descriptionEn}
+                      </p>
                     </div>
                   </div>
-                  <p className="text-sm sm:text-base text-gray-600 ml-8 sm:ml-16">
-                    {language === 'es' ? module.description : module.descriptionEn}
-                  </p>
                 </div>
                 
                 <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 sm:ml-8">

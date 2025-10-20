@@ -152,6 +152,5 @@ export class UserModel {
     `;
 
     await connection.execute(createTableQuery);
-    console.log('✅ Tabla de usuarios creada/verificada correctamente');
   }
 }

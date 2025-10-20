@@ -9,6 +9,7 @@ import FormField from '../../components/molecules/FormField';
 import SelectField from '../../components/molecules/SelectField';
 import Button from '../../components/atoms/Button';
 import LanguageSwitcher from '../../components/organisms/LanguageSwitcher';
+import StepNumber from '../../components/atoms/StepNumber';
 
 interface PatientInfoData {
   firstName: string;
@@ -175,7 +176,6 @@ export default function PatientInfoForm() {
   // Obtener expediente del paciente cuando esté autenticado
   useEffect(() => {
     if (isAuthenticated && !patientId) {
-      console.log('🔍 Patient Info: No hay patientId, llamando getPatientRecord...');
       getPatientRecord();
     }
   }, [isAuthenticated, patientId, getPatientRecord]);
@@ -191,9 +191,7 @@ export default function PatientInfoForm() {
     
     try {
       const token = localStorage.getItem('token');
-      console.log('🔍 Token encontrado en localStorage:', token ? 'Sí' : 'No');
 
-      console.log('🔍 Enviando datos del formulario...');
       const response = await fetch('/api/forms/patient-info', {
         method: 'POST',
         headers: {
@@ -203,9 +201,7 @@ export default function PatientInfoForm() {
         body: JSON.stringify(formData)
       });
 
-      console.log('🔍 Respuesta recibida:', response.status, response.statusText);
       const result = await response.json();
-      console.log('🔍 Resultado:', result);
 
       if (result.success) {
         alert(language === 'es' ? 'Formulario guardado correctamente' : 'Form saved successfully');
@@ -246,13 +242,21 @@ export default function PatientInfoForm() {
         {/* Header con Patient ID */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-[#212e5c] mb-2">
-                {language === 'es' ? 'Información del Paciente' : 'Patient Information'}
-              </h1>
-              <p className="text-gray-600">
-                {language === 'es' ? 'Módulo 1 de 4' : 'Module 1 of 4'}
-              </p>
+            <div className="flex items-center gap-6">
+              <StepNumber 
+                stepNumber={1}
+                totalSteps={4}
+                isActive={true}
+                className="flex-shrink-0"
+              />
+              <div>
+                <h1 className="text-3xl font-bold text-[#212e5c] mb-2">
+                  {language === 'es' ? 'Información del Paciente' : 'Patient Information'}
+                </h1>
+                <p className="text-gray-600">
+                  {language === 'es' ? 'Módulo 1 de 4' : 'Module 1 of 4'}
+                </p>
+              </div>
             </div>
             <div className="text-right">
               <div className="text-sm text-gray-500 mb-1">

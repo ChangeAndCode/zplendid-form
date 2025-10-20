@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PatientRecordModel } from '../../../../lib/models/PatientRecord';
 import { getConnection } from '../../../../lib/config/database';
 import { JWTUtils } from '../../../../lib/utils/jwt';
+import { AutoSchema } from '../../../../lib/utils/autoSchema';
 
 interface MedicalHistoryData {
   // Past Medical History
@@ -11,19 +12,28 @@ interface MedicalHistoryData {
   diabetes: string;
   useInsulin: string;
   
+  // Other Conditions
+  otherMedicalConditions: string;
+  
   // Heart Problems
   highBloodPressure: string;
   heartProblems: string;
   
   // Respiratory
   respiratoryProblems: string;
+  respiratoryProblemsDetails: string;
   
   // Other Systems
   urinaryConditions: string;
+  urinaryConditionsDetails: string;
   muscularConditions: string;
+  muscularConditionsDetails: string;
   neurologicalConditions: string;
+  neurologicalConditionsDetails: string;
   bloodDisorders: string;
+  bloodDisordersDetails: string;
   endocrineCondition: string;
+  endocrineConditionDetails: string;
   gastrointestinalConditions: string;
   headNeckConditions: string;
   skinConditions: string;
@@ -134,72 +144,25 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const data = medicalData[0] as {
-      sleepApnea: string;
-      useCpap: string;
-      cpapDetails: string;
-      diabetes: string;
-      useInsulin: string;
-      highBloodPressure: string;
-      heartProblems: string;
-      respiratoryProblems: string;
-      urinaryConditions: string;
-      muscularConditions: string;
-      neurologicalConditions: string;
-      bloodDisorders: string;
-      endocrineCondition: string;
-      gastrointestinalConditions: string;
-      headNeckConditions: string;
-      skinConditions: string;
-      constitutionalSymptoms: string;
-      hepatitis: string;
-      hiv: string;
-      refuseBlood: string;
-      psychiatricHospital: string;
-      attemptedSuicide: string;
-      depression: string;
-      anxiety: string;
-      eatingDisorders: string;
-      psychiatricMedications: string;
-      psychiatricTherapy: string;
-      psychiatricHospitalization: string;
-      tobacco: string;
-      tobaccoDetails: string;
-      alcohol: string;
-      alcoholDetails: string;
-      drugs: string;
-      drugsDetails: string;
-      caffeine: string;
-      diet: string;
-      otherSubstances: string;
-      medications: string;
-      allergies: string;
-      previousSurgeries: string;
-      surgicalComplications: string;
-      dietProgram: string;
-      pregnancy: string;
-      pregnancyDetails: string;
-      referral: string;
-      referralDetails: string;
-      otherConditions: string;
-      hospitalizations: string;
-      hospitalizationsDetails: string;
-    };
+    // Tipo para los datos de la base de datos (incluye todos los campos posibles)
+    type MedicalHistoryDBData = Record<string, string | null | undefined>;
+    const data = medicalData[0] as MedicalHistoryDBData;
     
         // Función para mapear valores ENUM de la base de datos al formulario
-        const mapFormValue = (value: string): string => {
+        const mapFormValue = (value: string | null | undefined): string => {
           if (!value || value === 'unknown') return '';
           return value;
         };
 
-        // Mapear los datos de la base de datos al formato del formulario
-        const formData = {
+        // Mapear DINÁMICAMENTE todos los campos de la base de datos al formato del formulario
+        const formData: MedicalHistoryData = {
           // Past Medical History
           sleepApnea: mapFormValue(data.sleepApnea),
           useCpap: mapFormValue(data.useCpap),
           cpapDetails: data.cpapDetails || '',
           diabetes: mapFormValue(data.diabetes),
           useInsulin: mapFormValue(data.useInsulin),
+          otherMedicalConditions: data.otherMedicalConditions || '',
           
           // Heart Problems
           highBloodPressure: mapFormValue(data.highBloodPressure),
@@ -207,13 +170,19 @@ export async function GET(request: NextRequest) {
 
           // Respiratory
           respiratoryProblems: mapFormValue(data.respiratoryProblems),
+          respiratoryProblemsDetails: data.respiratoryProblemsDetails || '',
 
           // Other Systems
           urinaryConditions: mapFormValue(data.urinaryConditions),
+          urinaryConditionsDetails: data.urinaryConditionsDetails || '',
           muscularConditions: mapFormValue(data.muscularConditions),
+          muscularConditionsDetails: data.muscularConditionsDetails || '',
           neurologicalConditions: mapFormValue(data.neurologicalConditions),
+          neurologicalConditionsDetails: data.neurologicalConditionsDetails || '',
           bloodDisorders: mapFormValue(data.bloodDisorders),
+          bloodDisordersDetails: data.bloodDisordersDetails || '',
           endocrineCondition: mapFormValue(data.endocrineCondition),
+          endocrineConditionDetails: data.endocrineConditionDetails || '',
           gastrointestinalConditions: mapFormValue(data.gastrointestinalConditions),
           headNeckConditions: mapFormValue(data.headNeckConditions),
           skinConditions: mapFormValue(data.skinConditions),
@@ -230,7 +199,7 @@ export async function GET(request: NextRequest) {
           depression: mapFormValue(data.depression),
           anxiety: mapFormValue(data.anxiety),
           eatingDisorders: mapFormValue(data.eatingDisorders),
-          psychiatricMedications: mapFormValue(data.psychiatricMedications),
+          psychiatricMedications: data.psychiatricMedications || '',
           psychiatricTherapy: mapFormValue(data.psychiatricTherapy),
           psychiatricHospitalization: mapFormValue(data.psychiatricHospitalization),
 
@@ -287,7 +256,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔍 Recibiendo petición para guardar formulario de historial médico...');
+    // Asegurar que todas las columnas necesarias existan (comportamiento tipo Excel)
+    await AutoSchema.ensureMedicalHistoryColumns();
     
     const authHeader = request.headers.get('authorization');
     const token = JWTUtils.extractTokenFromHeader(authHeader || undefined);
@@ -302,17 +272,6 @@ export async function POST(request: NextRequest) {
     const decoded = JWTUtils.verifyToken(token);
     const body = await request.json();
     const formData: MedicalHistoryData = body;
-    
-    console.log('🔍 Datos recibidos del frontend:', formData);
-    console.log('🔍 Campos específicos recibidos:', {
-      sleepApnea: formData.sleepApnea,
-      diabetes: formData.diabetes,
-      highBloodPressure: formData.highBloodPressure,
-      medications: formData.medications,
-      allergies: formData.allergies,
-      tobacco: formData.tobacco,
-      alcohol: formData.alcohol
-    });
 
     // Obtener el expediente del paciente
     let patientRecord = await PatientRecordModel.findByUserId(decoded.userId);
@@ -344,8 +303,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Guardar los datos del formulario en la tabla específica
-    console.log('🔍 Guardando datos de historial médico...');
-    
     // Función para asegurar que todos los valores sean strings
     const mapStringValue = (value: string): string => {
       // Si está vacío, undefined, null, o no es string, devolver string vacío
@@ -356,93 +313,12 @@ export async function POST(request: NextRequest) {
       return String(value);
     };
 
-    // Mapear los datos del formulario directamente a las columnas individuales
-    const mappedData = {
-      // Past Medical History
-      sleepApnea: mapStringValue(formData.sleepApnea),
-      useCpap: mapStringValue(formData.useCpap),
-      cpapDetails: mapStringValue(formData.cpapDetails),
-      diabetes: mapStringValue(formData.diabetes),
-      useInsulin: mapStringValue(formData.useInsulin),
-      
-      // Heart Problems
-      highBloodPressure: mapStringValue(formData.highBloodPressure),
-      heartProblems: mapStringValue(formData.heartProblems),
-      
-      // Respiratory
-      respiratoryProblems: mapStringValue(formData.respiratoryProblems),
-      
-      // Other Systems
-      urinaryConditions: mapStringValue(formData.urinaryConditions),
-      muscularConditions: mapStringValue(formData.muscularConditions),
-      neurologicalConditions: mapStringValue(formData.neurologicalConditions),
-      bloodDisorders: mapStringValue(formData.bloodDisorders),
-      endocrineCondition: mapStringValue(formData.endocrineCondition),
-      gastrointestinalConditions: mapStringValue(formData.gastrointestinalConditions),
-      headNeckConditions: mapStringValue(formData.headNeckConditions),
-      skinConditions: mapStringValue(formData.skinConditions),
-      constitutionalSymptoms: mapStringValue(formData.constitutionalSymptoms),
-      
-      // Infectious Diseases
-      hepatitis: mapStringValue(formData.hepatitis),
-      hiv: mapStringValue(formData.hiv),
-      refuseBlood: mapStringValue(formData.refuseBlood),
-      
-      // Psychiatric
-      psychiatricHospital: mapStringValue(formData.psychiatricHospital),
-      attemptedSuicide: mapStringValue(formData.attemptedSuicide),
-      depression: mapStringValue(formData.depression),
-      anxiety: mapStringValue(formData.anxiety),
-      eatingDisorders: mapStringValue(formData.eatingDisorders),
-      psychiatricMedications: mapStringValue(formData.psychiatricMedications),
-      psychiatricTherapy: mapStringValue(formData.psychiatricTherapy),
-      psychiatricHospitalization: mapStringValue(formData.psychiatricHospitalization),
-      
-      // Social History
-      tobacco: mapStringValue(formData.tobacco),
-      tobaccoDetails: mapStringValue(formData.tobaccoDetails),
-      alcohol: mapStringValue(formData.alcohol),
-      alcoholDetails: mapStringValue(formData.alcoholDetails),
-      drugs: mapStringValue(formData.drugs),
-      drugsDetails: mapStringValue(formData.drugsDetails),
-      caffeine: mapStringValue(formData.caffeine),
-      diet: mapStringValue(formData.diet),
-      otherSubstances: mapStringValue(formData.otherSubstances),
-      
-      // Medications & Allergies
-      medications: mapStringValue(formData.medications),
-      allergies: mapStringValue(formData.allergies),
-      
-      // Past Surgical History
-      previousSurgeries: mapStringValue(formData.previousSurgeries),
-      surgicalComplications: mapStringValue(formData.surgicalComplications),
-      
-      // Diet Program
-      dietProgram: mapStringValue(formData.dietProgram),
-      
-      // Only for Women
-      pregnancy: mapStringValue(formData.pregnancy),
-      pregnancyDetails: mapStringValue(formData.pregnancyDetails),
-      
-      // Referral
-      referral: mapStringValue(formData.referral),
-      referralDetails: mapStringValue(formData.referralDetails),
-      
-      // Other
-      otherConditions: mapStringValue(formData.otherConditions),
-      hospitalizations: mapStringValue(formData.hospitalizations),
-      hospitalizationsDetails: mapStringValue(formData.hospitalizationsDetails)
-    };
+    // Mapear DINÁMICAMENTE todos los campos del formulario
+    const mappedData: Record<string, string> = {};
     
-    console.log('🔍 Datos DESPUÉS del mapeo:', mappedData);
-    console.log('🔍 Campos específicos DESPUÉS del mapeo:', {
-      sleepApnea: mappedData.sleepApnea,
-      diabetes: mappedData.diabetes,
-      highBloodPressure: mappedData.highBloodPressure,
-      medications: mappedData.medications,
-      allergies: mappedData.allergies,
-      tobacco: mappedData.tobacco,
-      alcohol: mappedData.alcohol
+    // Mapear todos los campos del formulario automáticamente
+    Object.keys(formData).forEach(key => {
+      mappedData[key] = mapStringValue(formData[key as keyof MedicalHistoryData]);
     });
     
     // Verificar si ya existe un registro para este paciente
@@ -451,72 +327,24 @@ export async function POST(request: NextRequest) {
       [medicalRecordId]
     );
 
+    // Crear consultas SQL dinámicamente
+    const fields = Object.keys(mappedData);
+    const placeholders = fields.map(() => '?').join(', ');
+    const setClause = fields.map(field => `${field} = ?`).join(', ');
+    const values = fields.map(field => mappedData[field]);
+
     if (Array.isArray(existing) && existing.length > 0) {
       // Actualizar registro existente
       await connection.execute(
-        `UPDATE medical_history SET 
-         sleepApnea = ?, useCpap = ?, cpapDetails = ?, diabetes = ?, useInsulin = ?,
-         otherConditions = ?, highBloodPressure = ?, heartProblems = ?, respiratoryProblems = ?,
-         urinaryConditions = ?, muscularConditions = ?, neurologicalConditions = ?,
-         bloodDisorders = ?, endocrineCondition = ?, gastrointestinalConditions = ?,
-         headNeckConditions = ?, skinConditions = ?, constitutionalSymptoms = ?,
-         hepatitis = ?, hiv = ?, refuseBlood = ?, psychiatricHospital = ?,
-         attemptedSuicide = ?, depression = ?, anxiety = ?, eatingDisorders = ?,
-         psychiatricMedications = ?, psychiatricTherapy = ?, psychiatricHospitalization = ?,
-         tobacco = ?, tobaccoDetails = ?, alcohol = ?, alcoholDetails = ?,
-         drugs = ?, drugsDetails = ?, caffeine = ?, diet = ?, otherSubstances = ?,
-         medications = ?, allergies = ?, previousSurgeries = ?, surgicalComplications = ?,
-         dietProgram = ?, pregnancy = ?, pregnancyDetails = ?, referral = ?,
-         referralDetails = ?, otherConditions = ?, hospitalizations = ?,
-         hospitalizationsDetails = ?, updatedAt = NOW()
-         WHERE medicalRecordId = ?`,
-        [
-          mappedData.sleepApnea, mappedData.useCpap, mappedData.cpapDetails, mappedData.diabetes, mappedData.useInsulin,
-          mappedData.otherConditions, mappedData.highBloodPressure, mappedData.heartProblems, mappedData.respiratoryProblems,
-          mappedData.urinaryConditions, mappedData.muscularConditions, mappedData.neurologicalConditions,
-          mappedData.bloodDisorders, mappedData.endocrineCondition, mappedData.gastrointestinalConditions,
-          mappedData.headNeckConditions, mappedData.skinConditions, mappedData.constitutionalSymptoms,
-          mappedData.hepatitis, mappedData.hiv, mappedData.refuseBlood, mappedData.psychiatricHospital,
-          mappedData.attemptedSuicide, mappedData.depression, mappedData.anxiety, mappedData.eatingDisorders,
-          mappedData.psychiatricMedications, mappedData.psychiatricTherapy, mappedData.psychiatricHospitalization,
-          mappedData.tobacco, mappedData.tobaccoDetails, mappedData.alcohol, mappedData.alcoholDetails,
-          mappedData.drugs, mappedData.drugsDetails, mappedData.caffeine, mappedData.diet, mappedData.otherSubstances,
-          mappedData.medications, mappedData.allergies, mappedData.previousSurgeries, mappedData.surgicalComplications,
-          mappedData.dietProgram, mappedData.pregnancy, mappedData.pregnancyDetails, mappedData.referral,
-          mappedData.referralDetails, mappedData.otherConditions, mappedData.hospitalizations,
-          mappedData.hospitalizationsDetails, medicalRecordId
-        ]
+        `UPDATE medical_history SET ${setClause}, updatedAt = NOW() WHERE medicalRecordId = ?`,
+        [...values, medicalRecordId]
       );
-      console.log(`✅ Datos de historial médico actualizados para paciente ${patientRecord.patientId}`);
     } else {
       // Crear nuevo registro
       await connection.execute(
-        `INSERT INTO medical_history 
-         (medicalRecordId, sleepApnea, useCpap, cpapDetails, diabetes, useInsulin,
-          otherConditions, highBloodPressure, heartProblems, respiratoryProblems, urinaryConditions, 
-          muscularConditions, neurologicalConditions, bloodDisorders, endocrineCondition, 
-          gastrointestinalConditions, headNeckConditions, skinConditions, constitutionalSymptoms,
-          hepatitis, hiv, refuseBlood, psychiatricHospital, attemptedSuicide, depression, 
-          anxiety, eatingDisorders, psychiatricMedications, psychiatricTherapy, psychiatricHospitalization,
-          tobacco, tobaccoDetails, alcohol, alcoholDetails, drugs, drugsDetails, caffeine, 
-          diet, otherSubstances, medications, allergies, previousSurgeries, surgicalComplications,
-          dietProgram, pregnancy, pregnancyDetails, referral, referralDetails, otherConditions,
-          hospitalizations, hospitalizationsDetails)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          medicalRecordId, mappedData.sleepApnea, mappedData.useCpap, mappedData.cpapDetails, mappedData.diabetes, mappedData.useInsulin,
-          mappedData.otherConditions, mappedData.highBloodPressure, mappedData.heartProblems, mappedData.respiratoryProblems, mappedData.urinaryConditions,
-          mappedData.muscularConditions, mappedData.neurologicalConditions, mappedData.bloodDisorders, mappedData.endocrineCondition,
-          mappedData.gastrointestinalConditions, mappedData.headNeckConditions, mappedData.skinConditions, mappedData.constitutionalSymptoms,
-          mappedData.hepatitis, mappedData.hiv, mappedData.refuseBlood, mappedData.psychiatricHospital, mappedData.attemptedSuicide, mappedData.depression,
-          mappedData.anxiety, mappedData.eatingDisorders, mappedData.psychiatricMedications, mappedData.psychiatricTherapy, mappedData.psychiatricHospitalization,
-          mappedData.tobacco, mappedData.tobaccoDetails, mappedData.alcohol, mappedData.alcoholDetails, mappedData.drugs, mappedData.drugsDetails, mappedData.caffeine,
-          mappedData.diet, mappedData.otherSubstances, mappedData.medications, mappedData.allergies, mappedData.previousSurgeries, mappedData.surgicalComplications,
-          mappedData.dietProgram, mappedData.pregnancy, mappedData.pregnancyDetails, mappedData.referral, mappedData.referralDetails, mappedData.otherConditions,
-          mappedData.hospitalizations, mappedData.hospitalizationsDetails
-        ]
+        `INSERT INTO medical_history (medicalRecordId, ${fields.join(', ')}) VALUES (?, ${placeholders})`,
+        [medicalRecordId, ...values]
       );
-      console.log(`✅ Datos de historial médico guardados para paciente ${patientRecord.patientId}`);
     }
 
     return NextResponse.json({

@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useState, useEffect } from 'react';
 import LanguageSwitcher from '../../components/organisms/LanguageSwitcher';
 import TreatmentInterestSteps from './components/TreatmentInterestSteps';
+import StepNumber from '../../components/atoms/StepNumber';
 
 interface SurgeryInterestData {
   // Previous Weight Loss Surgery
@@ -172,7 +173,6 @@ export default function SurgeryInterestForm() {
           if (response.ok) {
             const result = await response.json();
             if (result.success && result.data) {
-              console.log('🔍 Cargando datos existentes:', result.data);
               setFormData(result.data);
             }
           }
@@ -187,33 +187,18 @@ export default function SurgeryInterestForm() {
 
 
   const handleFormDataChange = (field: keyof SurgeryInterestData, value: string) => {
-    console.log('🔍 Actualizando campo:', field, 'con valor:', value);
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
     try {
       const token = localStorage.getItem('token');
-      console.log('🔍 Token encontrado en localStorage:', token ? 'Sí' : 'No');
       
       if (!token) {
         alert(language === 'es' ? 'No estás autenticado' : 'You are not authenticated');
         router.push('/');
         return;
       }
-
-      console.log('🔍 Enviando datos del formulario de interés quirúrgico...');
-      console.log('🔍 Datos del formulario ANTES de enviar:', formData);
-      console.log('🔍 Datos específicos:', {
-        previousWeightLossSurgery: formData.previousWeightLossSurgery,
-        previousSurgeonName: formData.previousSurgeonName,
-        consultedAboutWeightLoss: formData.consultedAboutWeightLoss,
-        consultationType: formData.consultationType,
-        consultationDate: formData.consultationDate,
-        surgeryInterest: formData.surgeryInterest,
-        firstTimeBariatricName: formData.firstTimeBariatricName,
-        estimatedSurgeryDate: formData.estimatedSurgeryDate
-      });
       
       const response = await fetch('/api/forms/surgery-interest', {
         method: 'POST',
@@ -224,9 +209,7 @@ export default function SurgeryInterestForm() {
         body: JSON.stringify(formData)
       });
 
-      console.log('🔍 Respuesta recibida:', response.status, response.statusText);
       const result = await response.json();
-      console.log('🔍 Resultado:', result);
 
       if (result.success) {
         alert(language === 'es' ? 'Formulario guardado correctamente' : 'Form saved successfully');
@@ -291,13 +274,21 @@ export default function SurgeryInterestForm() {
         {/* Header */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-[#212e5c] mb-2">
-                {language === 'es' ? 'Tratamiento de Interés' : 'Treatment Interest'}
-              </h1>
-              <p className="text-gray-600">
-                {language === 'es' ? 'Módulo 4 de 4' : 'Module 4 of 4'}
-              </p>
+            <div className="flex items-center gap-6">
+              <StepNumber 
+                stepNumber={2}
+                totalSteps={4}
+                isActive={true}
+                className="flex-shrink-0"
+              />
+              <div>
+                <h1 className="text-3xl font-bold text-[#212e5c] mb-2">
+                  {language === 'es' ? 'Tratamiento de Interés' : 'Treatment Interest'}
+                </h1>
+                <p className="text-gray-600">
+                  {language === 'es' ? 'Módulo 2 de 4' : 'Module 2 of 4'}
+                </p>
+              </div>
             </div>
             <div className="text-right">
               <div className="text-sm text-gray-500 mb-1">

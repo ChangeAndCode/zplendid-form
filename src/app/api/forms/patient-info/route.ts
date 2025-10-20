@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PatientRecordModel } from '../../../../lib/models/PatientRecord';
 import { getConnection } from '../../../../lib/config/database';
 import { JWTUtils } from '../../../../lib/utils/jwt';
+import { AutoSchema } from '../../../../lib/utils/autoSchema';
 
 interface PatientInfoData {
   firstName: string;
@@ -98,81 +99,57 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const data = patientData[0] as {
-      firstName: string;
-      lastName: string;
-      dateOfBirth: string;
-      age: string;
-      gender: string;
-      addressLine: string;
-      city: string;
-      country: string;
-      state: string;
-      zipcode: string;
-      phoneNumber: string;
-      email: string;
-      preferredContact: string;
-      occupation: string;
-      employer: string;
-      education: string;
-      emergencyFirstName: string;
-      emergencyLastName: string;
-      emergencyRelationship: string;
-      emergencyPhone: string;
-      measurementSystem: string;
-      heightFeet: string;
-      heightInches: string;
-      heightCm: string;
-      weightLbs: string;
-      weightKg: string;
-      bmi: string;
-      hearAboutUs: string;
-      hearAboutUsOther: string;
-      hasInsurance: string;
-      insuranceProvider: string;
-      policyNumber: string;
-      groupNumber: string;
-      additionalInfo: string;
+    // Tipo para los datos de la base de datos (incluye todos los campos posibles)
+    type PatientInfoDBData = Record<string, string | null | undefined>;
+    const data = patientData[0] as PatientInfoDBData;
+
+    // Función para mapear valores de la base de datos al formulario
+    const mapFormValue = (value: string | null | undefined): string => {
+      if (!value || value === 'unknown') return '';
+      return value;
+    };
+
+    // Mapear DINÁMICAMENTE todos los campos de la base de datos al formato del formulario
+    const formData: PatientInfoData = {
+      firstName: mapFormValue(data.firstName),
+      lastName: mapFormValue(data.lastName),
+      dateOfBirth: mapFormValue(data.dateOfBirth),
+      age: mapFormValue(data.age),
+      gender: mapFormValue(data.gender),
+      addressLine: mapFormValue(data.addressLine),
+      city: mapFormValue(data.city),
+      country: mapFormValue(data.country),
+      state: mapFormValue(data.state),
+      zipcode: mapFormValue(data.zipcode),
+      phoneNumber: mapFormValue(data.phoneNumber),
+      email: mapFormValue(data.email),
+      preferredContact: mapFormValue(data.preferredContact),
+      occupation: mapFormValue(data.occupation),
+      employer: mapFormValue(data.employer),
+      education: mapFormValue(data.education),
+      emergencyFirstName: mapFormValue(data.emergencyFirstName),
+      emergencyLastName: mapFormValue(data.emergencyLastName),
+      emergencyRelationship: mapFormValue(data.emergencyRelationship),
+      emergencyPhone: mapFormValue(data.emergencyPhone),
+      measurementSystem: (data.measurementSystem as 'standard' | 'metric') || 'standard',
+      heightFeet: mapFormValue(data.heightFeet),
+      heightInches: mapFormValue(data.heightInches),
+      heightCm: mapFormValue(data.heightCm),
+      weightLbs: mapFormValue(data.weightLbs),
+      weightKg: mapFormValue(data.weightKg),
+      bmi: mapFormValue(data.bmi),
+      hearAboutUs: mapFormValue(data.hearAboutUs),
+      hearAboutUsOther: mapFormValue(data.hearAboutUsOther),
+      hasInsurance: mapFormValue(data.hasInsurance),
+      insuranceProvider: mapFormValue(data.insuranceProvider),
+      policyNumber: mapFormValue(data.policyNumber),
+      groupNumber: mapFormValue(data.groupNumber),
+      additionalInfo: mapFormValue(data.additionalInfo)
     };
 
     return NextResponse.json({
       success: true,
-      data: {
-        firstName: data.firstName || '',
-        lastName: data.lastName || '',
-        dateOfBirth: data.dateOfBirth || '',
-        age: data.age || '',
-        gender: data.gender || '',
-        addressLine: data.addressLine || '',
-        city: data.city || '',
-        country: data.country || '',
-        state: data.state || '',
-        zipcode: data.zipcode || '',
-        phoneNumber: data.phoneNumber || '',
-        email: data.email || '',
-        preferredContact: data.preferredContact || '',
-        occupation: data.occupation || '',
-        employer: data.employer || '',
-        education: data.education || '',
-        emergencyFirstName: data.emergencyFirstName || '',
-        emergencyLastName: data.emergencyLastName || '',
-        emergencyRelationship: data.emergencyRelationship || '',
-        emergencyPhone: data.emergencyPhone || '',
-        measurementSystem: data.measurementSystem || '',
-        heightFeet: data.heightFeet || '',
-        heightInches: data.heightInches || '',
-        heightCm: data.heightCm || '',
-        weightLbs: data.weightLbs || '',
-        weightKg: data.weightKg || '',
-        bmi: data.bmi || '',
-        hearAboutUs: data.hearAboutUs || '',
-        hearAboutUsOther: data.hearAboutUsOther || '',
-        hasInsurance: data.hasInsurance || '',
-        insuranceProvider: data.insuranceProvider || '',
-        policyNumber: data.policyNumber || '',
-        groupNumber: data.groupNumber || '',
-        additionalInfo: data.additionalInfo || ''
-      },
+      data: formData,
       message: 'Datos cargados correctamente'
     });
 
@@ -187,16 +164,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔍 Recibiendo petición para guardar formulario de paciente...');
+    // Asegurar que todas las columnas necesarias existan (comportamiento tipo Excel)
+    await AutoSchema.ensurePatientInfoColumns();
     
     const authHeader = request.headers.get('authorization');
-    console.log('🔍 Auth header:', authHeader ? 'Presente' : 'Ausente');
-    
     const token = JWTUtils.extractTokenFromHeader(authHeader || undefined);
-    console.log('🔍 Token extraído:', token ? 'Sí' : 'No');
 
     if (!token) {
-      console.log('❌ No hay token');
       return NextResponse.json(
         { success: false, message: 'Token de acceso requerido' },
         { status: 401 }
@@ -204,11 +178,8 @@ export async function POST(request: NextRequest) {
     }
 
     const decoded = JWTUtils.verifyToken(token);
-    console.log('🔍 Token verificado, userId:', decoded.userId);
-    
     const body = await request.json();
     const formData: PatientInfoData = body;
-    console.log('🔍 Datos del formulario recibidos:', Object.keys(formData));
 
     // Obtener el expediente del paciente
     let patientRecord = await PatientRecordModel.findByUserId(decoded.userId);
@@ -240,55 +211,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Guardar los datos del formulario en la tabla específica
-    console.log('🔍 Guardando datos en la base de datos...');
-    
-    // Función para limpiar datos undefined -> null
-    const cleanData = (data: PatientInfoData) => {
-      const cleaned: Record<string, unknown> = {};
-      
-      // Lista de todos los campos que necesita la tabla
-      const requiredFields = [
-        'firstName', 'lastName', 'dateOfBirth', 'age', 'gender', 'addressLine', 'city',
-        'country', 'state', 'zipcode', 'phoneNumber', 'email', 'preferredContact',
-        'occupation', 'employer', 'education', 'emergencyFirstName', 'emergencyLastName',
-        'emergencyRelationship', 'emergencyPhone', 'measurementSystem', 'heightFeet',
-        'heightInches', 'heightCm', 'weightLbs', 'weightKg', 'bmi', 'hearAboutUs',
-        'hearAboutUsOther', 'hasInsurance', 'insuranceProvider', 'policyNumber',
-        'groupNumber', 'additionalInfo'
-      ];
-      
-      // Inicializar todos los campos como null
-      requiredFields.forEach(field => {
-        cleaned[field] = null;
-      });
-      
-      // Llenar con los datos del formulario
-      for (const [key, value] of Object.entries(data)) {
-        if (requiredFields.includes(key)) {
-          cleaned[key] = value === undefined || value === '' ? null : value;
-        }
+    // Función para asegurar que todos los valores sean strings
+    const mapStringValue = (value: string): string => {
+      // Si está vacío, undefined, null, o no es string, devolver string vacío
+      if (!value || value === '' || value === 'undefined' || value === 'null') {
+        return '';
       }
-      
-      return cleaned;
+      // Devolver el valor como string
+      return String(value);
     };
 
-    const cleanedData = cleanData(formData);
+    // Mapear DINÁMICAMENTE todos los campos del formulario
+    const mappedData: Record<string, string> = {};
     
-    // Debug completo de datos
-    console.log('🔍 Datos originales del formulario:');
-    console.log('📊 Total campos:', Object.keys(formData).length);
-    console.log('📋 Campos:', Object.keys(formData));
-    console.log('📝 Valores:', formData);
-    
-    console.log('🔍 Datos limpiados:');
-    console.log('📊 Total campos:', Object.keys(cleanedData).length);
-    console.log('📋 Campos:', Object.keys(cleanedData));
-    console.log('📝 Valores:', cleanedData);
-    
-    // Verificar tipos de datos específicos
-    console.log('🔍 Verificación de tipos:');
-    Object.entries(cleanedData).forEach(([key, value]) => {
-      console.log(`  ${key}: ${typeof value} = ${value}`);
+    // Mapear todos los campos del formulario automáticamente
+    Object.keys(formData).forEach(key => {
+      mappedData[key] = mapStringValue(formData[key as keyof PatientInfoData]);
     });
     
     // Verificar si ya existe un registro para este paciente
@@ -297,74 +235,24 @@ export async function POST(request: NextRequest) {
       [medicalRecordId]
     );
 
+    // Crear consultas SQL dinámicamente
+    const fields = Object.keys(mappedData);
+    const placeholders = fields.map(() => '?').join(', ');
+    const setClause = fields.map(field => `${field} = ?`).join(', ');
+    const values = fields.map(field => mappedData[field]);
+
     if (Array.isArray(existing) && existing.length > 0) {
       // Actualizar registro existente
       await connection.execute(
-        `UPDATE patient_info SET 
-         firstName = ?, lastName = ?, dateOfBirth = ?, age = ?, gender = ?,
-         addressLine = ?, city = ?, country = ?, state = ?, zipcode = ?,
-         phoneNumber = ?, email = ?, preferredContact = ?, occupation = ?,
-         employer = ?, education = ?, emergencyFirstName = ?, emergencyLastName = ?,
-         emergencyRelationship = ?, emergencyPhone = ?, measurementSystem = ?,
-         heightFeet = ?, heightInches = ?, heightCm = ?, weightLbs = ?,
-         weightKg = ?, bmi = ?, hearAboutUs = ?, hearAboutUsOther = ?,
-         hasInsurance = ?, insuranceProvider = ?, policyNumber = ?,
-         groupNumber = ?, additionalInfo = ?, updatedAt = NOW() 
-         WHERE medicalRecordId = ?`,
-        [
-          cleanedData.firstName, cleanedData.lastName, cleanedData.dateOfBirth, cleanedData.age, cleanedData.gender,
-          cleanedData.addressLine, cleanedData.city, cleanedData.country, cleanedData.state, cleanedData.zipcode,
-          cleanedData.phoneNumber, cleanedData.email, cleanedData.preferredContact, cleanedData.occupation,
-          cleanedData.employer, cleanedData.education, cleanedData.emergencyFirstName, cleanedData.emergencyLastName,
-          cleanedData.emergencyRelationship, cleanedData.emergencyPhone, cleanedData.measurementSystem,
-          cleanedData.heightFeet, cleanedData.heightInches, cleanedData.heightCm, cleanedData.weightLbs,
-          cleanedData.weightKg, cleanedData.bmi, cleanedData.hearAboutUs, cleanedData.hearAboutUsOther,
-          cleanedData.hasInsurance, cleanedData.insuranceProvider, cleanedData.policyNumber,
-          cleanedData.groupNumber, cleanedData.additionalInfo, medicalRecordId
-        ]
+        `UPDATE patient_info SET ${setClause}, updatedAt = NOW() WHERE medicalRecordId = ?`,
+        [...values, medicalRecordId]
       );
-      console.log(`✅ Datos de información del paciente actualizados para paciente ${patientRecord.patientId}`);
     } else {
       // Crear nuevo registro
-      console.log('🔍 Preparando INSERT con estos valores:');
-      const insertValues = [
-        medicalRecordId, cleanedData.firstName, cleanedData.lastName, cleanedData.dateOfBirth, cleanedData.age, cleanedData.gender,
-        cleanedData.addressLine, cleanedData.city, cleanedData.country, cleanedData.state, cleanedData.zipcode,
-        cleanedData.phoneNumber, cleanedData.email, cleanedData.preferredContact, cleanedData.occupation,
-        cleanedData.employer, cleanedData.education, cleanedData.emergencyFirstName, cleanedData.emergencyLastName,
-        cleanedData.emergencyRelationship, cleanedData.emergencyPhone, cleanedData.measurementSystem,
-        cleanedData.heightFeet, cleanedData.heightInches, cleanedData.heightCm, cleanedData.weightLbs,
-        cleanedData.weightKg, cleanedData.bmi, cleanedData.hearAboutUs, cleanedData.hearAboutUsOther,
-        cleanedData.hasInsurance, cleanedData.insuranceProvider, cleanedData.policyNumber,
-        cleanedData.groupNumber, cleanedData.additionalInfo
-      ];
-      
-      console.log('📊 Total valores para INSERT:', insertValues.length);
-      console.log('📝 Valores del INSERT:', insertValues);
-      
-      // Verificar si hay undefined en los valores
-      const undefinedValues = insertValues.filter((val) => val === undefined);
-      if (undefinedValues.length > 0) {
-        console.log('❌ ERROR: Valores undefined encontrados:', undefinedValues.length);
-        insertValues.forEach((val, index) => {
-          if (val === undefined) {
-            console.log(`  Índice ${index}: undefined`);
-          }
-        });
-      }
-      
       await connection.execute(
-        `INSERT INTO patient_info 
-         (medicalRecordId, firstName, lastName, dateOfBirth, age, gender, addressLine, city, 
-          country, state, zipcode, phoneNumber, email, preferredContact, occupation, employer, 
-          education, emergencyFirstName, emergencyLastName, emergencyRelationship, emergencyPhone,
-          measurementSystem, heightFeet, heightInches, heightCm, weightLbs, weightKg, bmi,
-          hearAboutUs, hearAboutUsOther, hasInsurance, insuranceProvider, policyNumber, 
-          groupNumber, additionalInfo, createdAt, updatedAt) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        insertValues
+        `INSERT INTO patient_info (medicalRecordId, ${fields.join(', ')}) VALUES (?, ${placeholders})`,
+        [medicalRecordId, ...values]
       );
-      console.log(`✅ Datos de información del paciente guardados para paciente ${patientRecord.patientId}`);
     }
 
     return NextResponse.json({
