@@ -39,6 +39,7 @@ export interface AuthResponse {
   message: string;
   user?: UserResponse;
   token?: string;
+  patientId?: string;
 }
 
 export interface JWTPayload {

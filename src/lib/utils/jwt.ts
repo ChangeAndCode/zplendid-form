@@ -40,7 +40,7 @@ export class JWTUtils {
   /**
    * Extraer token del header Authorization
    */
-  static extractTokenFromHeader(authHeader: string | undefined): string | undefined {
+  static extractTokenFromHeader(authHeader: string | null | undefined): string | undefined {
     if (!authHeader) {
       return undefined;
     }

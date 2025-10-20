@@ -12,17 +12,17 @@ export class PatientRecordModel {
   /**
    * Crear un nuevo expediente de paciente
    */
-  static async create(userId: number): Promise<PatientRecord> {
+  static async create(userId: number, patientId?: string): Promise<PatientRecord> {
     const connection = await getConnection();
     
-    // Generar número de expediente único
-    const patientId = await this.generateUniquePatientId();
+    // Generar número de expediente único si no se proporciona
+    const finalPatientId = patientId || await this.generateUniquePatientId();
 
     // Insertar el nuevo expediente
     const [result] = await connection.execute(
       `INSERT INTO patient_records (patientId, userId, createdAt, updatedAt) 
        VALUES (?, ?, NOW(), NOW())`,
-      [patientId, userId]
+      [finalPatientId, userId]
     );
 
     const insertResult = result as { insertId: number };
@@ -71,7 +71,7 @@ export class PatientRecordModel {
   /**
    * Generar número de expediente único
    */
-  private static async generateUniquePatientId(): Promise<string> {
+  static async generateUniquePatientId(): Promise<string> {
     const connection = await getConnection();
     
     let isUnique = false;

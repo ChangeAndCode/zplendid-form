@@ -11,9 +11,6 @@ interface MedicalHistoryData {
   diabetes: string;
   useInsulin: string;
   
-  // Other Conditions
-  otherMedicalConditions: string;
-  
   // Heart Problems
   highBloodPressure: string;
   heartProblems: string;
@@ -204,9 +201,6 @@ export async function GET(request: NextRequest) {
           diabetes: mapFormValue(data.diabetes),
           useInsulin: mapFormValue(data.useInsulin),
           
-          // Other Conditions
-          otherMedicalConditions: data.otherMedicalConditions || '',
-
           // Heart Problems
           highBloodPressure: mapFormValue(data.highBloodPressure),
           heartProblems: mapFormValue(data.heartProblems),
@@ -371,9 +365,6 @@ export async function POST(request: NextRequest) {
       diabetes: mapStringValue(formData.diabetes),
       useInsulin: mapStringValue(formData.useInsulin),
       
-      // Other Conditions
-      otherMedicalConditions: mapStringValue(formData.otherMedicalConditions),
-      
       // Heart Problems
       highBloodPressure: mapStringValue(formData.highBloodPressure),
       heartProblems: mapStringValue(formData.heartProblems),
@@ -465,7 +456,7 @@ export async function POST(request: NextRequest) {
       await connection.execute(
         `UPDATE medical_history SET 
          sleepApnea = ?, useCpap = ?, cpapDetails = ?, diabetes = ?, useInsulin = ?,
-         otherMedicalConditions = ?, highBloodPressure = ?, heartProblems = ?, respiratoryProblems = ?,
+         otherConditions = ?, highBloodPressure = ?, heartProblems = ?, respiratoryProblems = ?,
          urinaryConditions = ?, muscularConditions = ?, neurologicalConditions = ?,
          bloodDisorders = ?, endocrineCondition = ?, gastrointestinalConditions = ?,
          headNeckConditions = ?, skinConditions = ?, constitutionalSymptoms = ?,
@@ -481,7 +472,7 @@ export async function POST(request: NextRequest) {
          WHERE medicalRecordId = ?`,
         [
           mappedData.sleepApnea, mappedData.useCpap, mappedData.cpapDetails, mappedData.diabetes, mappedData.useInsulin,
-          mappedData.otherMedicalConditions, mappedData.highBloodPressure, mappedData.heartProblems, mappedData.respiratoryProblems,
+          mappedData.otherConditions, mappedData.highBloodPressure, mappedData.heartProblems, mappedData.respiratoryProblems,
           mappedData.urinaryConditions, mappedData.muscularConditions, mappedData.neurologicalConditions,
           mappedData.bloodDisorders, mappedData.endocrineCondition, mappedData.gastrointestinalConditions,
           mappedData.headNeckConditions, mappedData.skinConditions, mappedData.constitutionalSymptoms,
@@ -502,7 +493,7 @@ export async function POST(request: NextRequest) {
       await connection.execute(
         `INSERT INTO medical_history 
          (medicalRecordId, sleepApnea, useCpap, cpapDetails, diabetes, useInsulin,
-          otherMedicalConditions, highBloodPressure, heartProblems, respiratoryProblems, urinaryConditions, 
+          otherConditions, highBloodPressure, heartProblems, respiratoryProblems, urinaryConditions, 
           muscularConditions, neurologicalConditions, bloodDisorders, endocrineCondition, 
           gastrointestinalConditions, headNeckConditions, skinConditions, constitutionalSymptoms,
           hepatitis, hiv, refuseBlood, psychiatricHospital, attemptedSuicide, depression, 
@@ -514,7 +505,7 @@ export async function POST(request: NextRequest) {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           medicalRecordId, mappedData.sleepApnea, mappedData.useCpap, mappedData.cpapDetails, mappedData.diabetes, mappedData.useInsulin,
-          mappedData.otherMedicalConditions, mappedData.highBloodPressure, mappedData.heartProblems, mappedData.respiratoryProblems, mappedData.urinaryConditions,
+          mappedData.otherConditions, mappedData.highBloodPressure, mappedData.heartProblems, mappedData.respiratoryProblems, mappedData.urinaryConditions,
           mappedData.muscularConditions, mappedData.neurologicalConditions, mappedData.bloodDisorders, mappedData.endocrineCondition,
           mappedData.gastrointestinalConditions, mappedData.headNeckConditions, mappedData.skinConditions, mappedData.constitutionalSymptoms,
           mappedData.hepatitis, mappedData.hiv, mappedData.refuseBlood, mappedData.psychiatricHospital, mappedData.attemptedSuicide, mappedData.depression,

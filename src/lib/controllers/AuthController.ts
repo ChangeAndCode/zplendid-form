@@ -51,7 +51,10 @@ export class AuthController {
         email: newUser.email, 
         firstName: newUser.firstName, 
         lastName: newUser.lastName, 
-        role: newUser.role 
+        role: newUser.role,
+        isActive: newUser.isActive,
+        createdAt: newUser.createdAt,
+        updatedAt: newUser.updatedAt
       };
 
       return NextResponse.json(
@@ -134,7 +137,10 @@ export class AuthController {
         email: user.email, 
         firstName: user.firstName, 
         lastName: user.lastName, 
-        role: user.role 
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
       };
       
       return NextResponse.json({ 
@@ -180,10 +186,17 @@ export class AuthController {
         email: user.email, 
         firstName: user.firstName, 
         lastName: user.lastName, 
-        role: user.role 
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
       };
 
-      return NextResponse.json({ success: true, user: userResponse }, { status: 200 });
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Perfil obtenido exitosamente',
+        user: userResponse 
+      }, { status: 200 });
     } catch (error) {
       console.error('Error al obtener perfil:', error);
       return NextResponse.json({ success: false, message: 'Error interno del servidor' }, { status: 500 });
@@ -220,10 +233,17 @@ export class AuthController {
         email: user.email, 
         firstName: user.firstName, 
         lastName: user.lastName, 
-        role: user.role 
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
       };
 
-      return NextResponse.json({ success: true, user: userResponse }, { status: 200 });
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Token verificado exitosamente',
+        user: userResponse 
+      }, { status: 200 });
     } catch (error) {
       console.error('Error al verificar token:', error);
       return NextResponse.json({ success: false, message: 'Token inválido' }, { status: 401 });
@@ -233,7 +253,8 @@ export class AuthController {
   /**
    * Cerrar sesión
    */
-  static async logout(request: NextRequest): Promise<NextResponse<AuthResponse>> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  static async logout(_request: NextRequest): Promise<NextResponse<AuthResponse>> {
     try {
       // En un sistema JWT stateless, el logout se maneja principalmente en el frontend
       // Aquí podríamos implementar una blacklist de tokens si fuera necesario

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
-import { getPatientId, formatPatientId, hasExistingPatientId, getFormStorageKey } from '../utils/patientId';
+import { getPatientId, formatPatientId, hasExistingPatientId } from '../utils/patientId';
 import LanguageSwitcher from './organisms/LanguageSwitcher';
 import GlobalProgress from './organisms/GlobalProgress';
 
@@ -69,7 +69,7 @@ const formModules: FormModule[] = [
 
 export default function LandingPage() {
   const { language } = useLanguage();
-  const { isAuthenticated, isLoading, logout, user, patientId, getPatientRecord } = useAuth();
+  const { isAuthenticated, isLoading, logout, patientId, getPatientRecord } = useAuth();
   const router = useRouter();
   const [localPatientId, setLocalPatientId] = useState<string>('');
   const [isReturning, setIsReturning] = useState(false);

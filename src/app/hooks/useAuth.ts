@@ -76,6 +76,7 @@ export const useAuth = (): UseAuthReturn => {
     } else {
       setIsLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isAuthenticated = !!user && !!token;
@@ -118,6 +119,7 @@ export const useAuth = (): UseAuthReturn => {
     } finally {
       setIsLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const register = useCallback(async (userData: {
@@ -159,6 +161,7 @@ export const useAuth = (): UseAuthReturn => {
     } finally {
       setIsLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
@@ -263,6 +266,7 @@ export const useAuth = (): UseAuthReturn => {
       setIsLoading(false);
       return false;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const verifyToken = useCallback(async (): Promise<boolean> => {

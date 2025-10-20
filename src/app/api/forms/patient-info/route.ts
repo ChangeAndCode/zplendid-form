@@ -243,8 +243,8 @@ export async function POST(request: NextRequest) {
     console.log('🔍 Guardando datos en la base de datos...');
     
     // Función para limpiar datos undefined -> null
-    const cleanData = (data: any) => {
-      const cleaned: any = {};
+    const cleanData = (data: PatientInfoData) => {
+      const cleaned: Record<string, unknown> = {};
       
       // Lista de todos los campos que necesita la tabla
       const requiredFields = [
@@ -343,7 +343,7 @@ export async function POST(request: NextRequest) {
       console.log('📝 Valores del INSERT:', insertValues);
       
       // Verificar si hay undefined en los valores
-      const undefinedValues = insertValues.filter((val, index) => val === undefined);
+      const undefinedValues = insertValues.filter((val) => val === undefined);
       if (undefinedValues.length > 0) {
         console.log('❌ ERROR: Valores undefined encontrados:', undefinedValues.length);
         insertValues.forEach((val, index) => {

@@ -38,7 +38,7 @@ export class PatientFormDataModel {
   /**
    * Guardar datos de un formulario
    */
-  static async saveFormData(patientId: string, formType: string, formData: any): Promise<PatientFormData> {
+  static async saveFormData(patientId: string, formType: string, formData: Record<string, unknown>): Promise<PatientFormData> {
     const connection = await getConnection();
     try {
       // Verificar si ya existe un registro para este paciente y tipo de formulario
@@ -73,7 +73,7 @@ export class PatientFormDataModel {
   /**
    * Obtener datos de un formulario
    */
-  static async getFormData(patientId: string, formType: string): Promise<any | null> {
+  static async getFormData(patientId: string, formType: string): Promise<Record<string, unknown> | null> {
     const connection = await getConnection();
     try {
       const [rows] = await connection.execute(
@@ -82,7 +82,7 @@ export class PatientFormDataModel {
       );
 
       if (Array.isArray(rows) && rows.length > 0) {
-        const result = rows[0] as { formData: any };
+        const result = rows[0] as { formData: Record<string, unknown> };
         // Los datos ya están parseados por MySQL (columna JSON)
         return result.formData;
       }

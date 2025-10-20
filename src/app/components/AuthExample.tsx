@@ -46,6 +46,7 @@ export default function AuthExample() {
         });
       }
     } catch (error) {
+      console.error('Error en registro:', error);
       setMessage('Error inesperado');
     }
   };

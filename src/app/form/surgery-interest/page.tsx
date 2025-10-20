@@ -191,56 +191,65 @@ export default function SurgeryInterestForm() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleSave = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      console.log('🔍 Token encontrado en localStorage:', token ? 'Sí' : 'No');
+      
+      if (!token) {
+        alert(language === 'es' ? 'No estás autenticado' : 'You are not authenticated');
+        router.push('/');
+        return;
+      }
+
+      console.log('🔍 Enviando datos del formulario de interés quirúrgico...');
+      console.log('🔍 Datos del formulario ANTES de enviar:', formData);
+      console.log('🔍 Datos específicos:', {
+        previousWeightLossSurgery: formData.previousWeightLossSurgery,
+        previousSurgeonName: formData.previousSurgeonName,
+        consultedAboutWeightLoss: formData.consultedAboutWeightLoss,
+        consultationType: formData.consultationType,
+        consultationDate: formData.consultationDate,
+        surgeryInterest: formData.surgeryInterest,
+        firstTimeBariatricName: formData.firstTimeBariatricName,
+        estimatedSurgeryDate: formData.estimatedSurgeryDate
+      });
+      
+      const response = await fetch('/api/forms/surgery-interest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      console.log('🔍 Respuesta recibida:', response.status, response.statusText);
+      const result = await response.json();
+      console.log('🔍 Resultado:', result);
+
+      if (result.success) {
+        alert(language === 'es' ? 'Formulario guardado correctamente' : 'Form saved successfully');
+        return true;
+      } else {
+        alert(language === 'es' ? 'Error al guardar el formulario' : 'Error saving form');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert(language === 'es' ? 'Error al guardar el formulario' : 'Error saving form');
+      return false;
+    }
+  };
+
   const handleNext = async () => {
     if (currentStep < 5) {
       setCurrentStep(prev => prev + 1);
     } else {
       // Envío final del formulario
-      try {
-        const token = localStorage.getItem('token');
-        console.log('🔍 Token encontrado en localStorage:', token ? 'Sí' : 'No');
-        
-        if (!token) {
-          alert(language === 'es' ? 'No estás autenticado' : 'You are not authenticated');
-          router.push('/');
-          return;
-        }
-
-        console.log('🔍 Enviando datos del formulario de interés quirúrgico...');
-        console.log('🔍 Datos del formulario ANTES de enviar:', formData);
-        console.log('🔍 Datos específicos:', {
-          previousWeightLossSurgery: formData.previousWeightLossSurgery,
-          previousSurgeonName: formData.previousSurgeonName,
-          consultedAboutWeightLoss: formData.consultedAboutWeightLoss,
-          consultationType: formData.consultationType,
-          consultationDate: formData.consultationDate,
-          surgeryInterest: formData.surgeryInterest,
-          firstTimeBariatricName: formData.firstTimeBariatricName,
-          estimatedSurgeryDate: formData.estimatedSurgeryDate
-        });
-        
-        const response = await fetch('/api/forms/surgery-interest', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(formData)
-        });
-
-        console.log('🔍 Respuesta recibida:', response.status, response.statusText);
-        const result = await response.json();
-        console.log('🔍 Resultado:', result);
-
-        if (result.success) {
-          alert(language === 'es' ? 'Formulario guardado correctamente' : 'Form saved successfully');
-          router.push('/landing');
-        } else {
-          alert(language === 'es' ? 'Error al guardar el formulario' : 'Error saving form');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        alert(language === 'es' ? 'Error al guardar el formulario' : 'Error saving form');
+      const saved = await handleSave();
+      if (saved) {
+        router.push('/landing');
       }
     }
   };
