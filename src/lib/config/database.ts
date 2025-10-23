@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 
 // Cargar variables de entorno
 dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env.production' });
 
 export interface DatabaseConfig {
   host: string;
@@ -19,6 +20,15 @@ const config: DatabaseConfig = {
   database: process.env.DB_NAME || 'db_zplendid',
   port: parseInt(process.env.DB_PORT || '3306'),
 };
+
+// Debug: Log configuration (sin mostrar password)
+console.log('🔧 Database config:', {
+  host: config.host,
+  user: config.user,
+  database: config.database,
+  port: config.port,
+  hasPassword: !!config.password
+});
 
 let connection: mysql.Connection | null = null;
 
