@@ -1,4 +1,5 @@
 import { getConnection } from '../config/database';
+import sql from 'mssql';
 
 export interface PatientFormData {
   id?: number;
@@ -14,20 +15,24 @@ export class PatientFormDataModel {
    * Crea la tabla de datos de formularios si no existe.
    */
   static async createTable(): Promise<void> {
-    const connection = await getConnection();
+    const pool = await getConnection();
     try {
       const query = `
-        CREATE TABLE IF NOT EXISTS patient_form_data (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          patientId VARCHAR(20) NOT NULL,
-          formType VARCHAR(50) NOT NULL,
-          formData JSON NOT NULL,
-          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          INDEX idx_patient_form (patientId, formType)
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='patient_form_data' AND xtype='U')
+        CREATE TABLE patient_form_data (
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          patientId NVARCHAR(20) NOT NULL,
+          formType NVARCHAR(50) NOT NULL,
+          formData NVARCHAR(MAX) NOT NULL,
+          createdAt DATETIME2 DEFAULT GETDATE(),
+          updatedAt DATETIME2 DEFAULT GETDATE()
         );
+        
+        -- Crear índice si no existe
+        IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_patient_form' AND object_id = OBJECT_ID('patient_form_data'))
+        CREATE INDEX idx_patient_form ON patient_form_data (patientId, formType);
       `;
-      await connection.execute(query);
+      await pool.request().query(query);
     } catch (error) {
       console.error('❌ Error al crear la tabla de datos de formularios:', error);
       throw error;
@@ -38,26 +43,28 @@ export class PatientFormDataModel {
    * Guardar datos de un formulario
    */
   static async saveFormData(patientId: string, formType: string, formData: Record<string, unknown>): Promise<PatientFormData> {
-    const connection = await getConnection();
+    const pool = await getConnection();
     try {
       // Verificar si ya existe un registro para este paciente y tipo de formulario
-      const [existing] = await connection.execute(
-        'SELECT id FROM patient_form_data WHERE patientId = ? AND formType = ?',
-        [patientId, formType]
-      );
+      const existingResult = await pool.request()
+        .input('patientId', sql.VarChar(20), patientId)
+        .input('formType', sql.VarChar(50), formType)
+        .query('SELECT id FROM patient_form_data WHERE patientId = @patientId AND formType = @formType');
 
-      if (Array.isArray(existing) && existing.length > 0) {
+      if (existingResult.recordset.length > 0) {
         // Actualizar registro existente
-        await connection.execute(
-          'UPDATE patient_form_data SET formData = ?, updatedAt = NOW() WHERE patientId = ? AND formType = ?',
-          [JSON.stringify(formData), patientId, formType]
-        );
+        await pool.request()
+          .input('formData', sql.NVarChar(sql.MAX), JSON.stringify(formData))
+          .input('patientId', sql.VarChar(20), patientId)
+          .input('formType', sql.VarChar(50), formType)
+          .query('UPDATE patient_form_data SET formData = @formData, updatedAt = GETDATE() WHERE patientId = @patientId AND formType = @formType');
       } else {
         // Crear nuevo registro
-        await connection.execute(
-          'INSERT INTO patient_form_data (patientId, formType, formData) VALUES (?, ?, ?)',
-          [patientId, formType, JSON.stringify(formData)]
-        );
+        await pool.request()
+          .input('patientId', sql.VarChar(20), patientId)
+          .input('formType', sql.VarChar(50), formType)
+          .input('formData', sql.NVarChar(sql.MAX), JSON.stringify(formData))
+          .query('INSERT INTO patient_form_data (patientId, formType, formData) VALUES (@patientId, @formType, @formData)');
       }
 
       return { patientId, formType, formData: JSON.stringify(formData) };
@@ -71,17 +78,17 @@ export class PatientFormDataModel {
    * Obtener datos de un formulario
    */
   static async getFormData(patientId: string, formType: string): Promise<Record<string, unknown> | null> {
-    const connection = await getConnection();
+    const pool = await getConnection();
     try {
-      const [rows] = await connection.execute(
-        'SELECT formData FROM patient_form_data WHERE patientId = ? AND formType = ?',
-        [patientId, formType]
-      );
+      const result = await pool.request()
+        .input('patientId', sql.VarChar(20), patientId)
+        .input('formType', sql.VarChar(50), formType)
+        .query('SELECT formData FROM patient_form_data WHERE patientId = @patientId AND formType = @formType');
 
-      if (Array.isArray(rows) && rows.length > 0) {
-        const result = rows[0] as { formData: Record<string, unknown> };
-        // Los datos ya están parseados por MySQL (columna JSON)
-        return result.formData;
+      if (result.recordset.length > 0) {
+        const formDataString = result.recordset[0].formData as string;
+        // Parsear el JSON string
+        return JSON.parse(formDataString);
       }
 
       return null;

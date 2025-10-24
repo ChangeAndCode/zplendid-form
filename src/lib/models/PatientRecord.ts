@@ -1,4 +1,5 @@
 import { getConnection } from '../config/database';
+import sql from 'mssql';
 
 export interface PatientRecord {
   id: number;
@@ -13,28 +14,29 @@ export class PatientRecordModel {
    * Crear un nuevo expediente de paciente
    */
   static async create(userId: number, patientId?: string): Promise<PatientRecord> {
-    const connection = await getConnection();
+    const pool = await getConnection();
     
     // Generar número de expediente único si no se proporciona
     const finalPatientId = patientId || await this.generateUniquePatientId();
 
     // Insertar el nuevo expediente
-    const [result] = await connection.execute(
-      `INSERT INTO patient_records (patientId, userId, createdAt, updatedAt) 
-       VALUES (?, ?, NOW(), NOW())`,
-      [finalPatientId, userId]
-    );
+    const insertResult = await pool.request()
+      .input('patientId', sql.VarChar(20), finalPatientId)
+      .input('userId', sql.Int, userId)
+      .query(`
+        INSERT INTO patient_records (patientId, userId, createdAt, updatedAt) 
+        OUTPUT INSERTED.id
+        VALUES (@patientId, @userId, GETDATE(), GETDATE())
+      `);
 
-    const insertResult = result as { insertId: number };
-    const recordId = insertResult.insertId;
+    const recordId = insertResult.recordset[0].id;
 
     // Obtener el expediente creado
-    const [records] = await connection.execute(
-      'SELECT * FROM patient_records WHERE id = ?',
-      [recordId]
-    );
+    const recordResult = await pool.request()
+      .input('id', sql.Int, recordId)
+      .query('SELECT * FROM patient_records WHERE id = @id');
 
-    const record = (records as PatientRecord[])[0];
+    const record = recordResult.recordset[0] as PatientRecord;
     return record;
   }
 
@@ -42,37 +44,33 @@ export class PatientRecordModel {
    * Obtener expediente por ID de usuario
    */
   static async findByUserId(userId: number): Promise<PatientRecord | null> {
-    const connection = await getConnection();
+    const pool = await getConnection();
     
-    const [records] = await connection.execute(
-      'SELECT * FROM patient_records WHERE userId = ?',
-      [userId]
-    );
+    const result = await pool.request()
+      .input('userId', sql.Int, userId)
+      .query('SELECT * FROM patient_records WHERE userId = @userId');
 
-    const recordArray = records as PatientRecord[];
-    return recordArray.length > 0 ? recordArray[0] : null;
+    return result.recordset.length > 0 ? result.recordset[0] as PatientRecord : null;
   }
 
   /**
    * Obtener expediente por número de paciente
    */
   static async findByPatientId(patientId: string): Promise<PatientRecord | null> {
-    const connection = await getConnection();
+    const pool = await getConnection();
     
-    const [records] = await connection.execute(
-      'SELECT * FROM patient_records WHERE patientId = ?',
-      [patientId]
-    );
+    const result = await pool.request()
+      .input('patientId', sql.VarChar(20), patientId)
+      .query('SELECT * FROM patient_records WHERE patientId = @patientId');
 
-    const recordArray = records as PatientRecord[];
-    return recordArray.length > 0 ? recordArray[0] : null;
+    return result.recordset.length > 0 ? result.recordset[0] as PatientRecord : null;
   }
 
   /**
    * Generar número de expediente único
    */
   static async generateUniquePatientId(): Promise<string> {
-    const connection = await getConnection();
+    const pool = await getConnection();
     
     let isUnique = false;
     let patientId: string;
@@ -86,12 +84,11 @@ export class PatientRecordModel {
       patientId = `ZP${year}${month}${randomNum}`;
       
       // Verificar si ya existe
-      const [existing] = await connection.execute(
-        'SELECT id FROM patient_records WHERE patientId = ?',
-        [patientId]
-      );
+      const result = await pool.request()
+        .input('patientId', sql.VarChar(20), patientId)
+        .query('SELECT id FROM patient_records WHERE patientId = @patientId');
       
-      if (Array.isArray(existing) && existing.length === 0) {
+      if (result.recordset.length === 0) {
         isUnique = true;
       }
     }
@@ -103,21 +100,27 @@ export class PatientRecordModel {
    * Crear tabla de expedientes si no existe
    */
   static async createTable(): Promise<void> {
-    const connection = await getConnection();
+    const pool = await getConnection();
     
     const createTableQuery = `
-      CREATE TABLE IF NOT EXISTS patient_records (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        patientId VARCHAR(20) UNIQUE NOT NULL,
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='patient_records' AND xtype='U')
+      CREATE TABLE patient_records (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        patientId NVARCHAR(20) UNIQUE NOT NULL,
         userId INT NOT NULL,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_patientId (patientId),
-        INDEX idx_userId (userId),
+        createdAt DATETIME2 DEFAULT GETDATE(),
+        updatedAt DATETIME2 DEFAULT GETDATE(),
         FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      );
+      
+      -- Crear índices si no existen
+      IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_patientId' AND object_id = OBJECT_ID('patient_records'))
+      CREATE INDEX idx_patientId ON patient_records (patientId);
+      
+      IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_userId' AND object_id = OBJECT_ID('patient_records'))
+      CREATE INDEX idx_userId ON patient_records (userId);
     `;
 
-    await connection.execute(createTableQuery);
+    await pool.request().query(createTableQuery);
   }
 }

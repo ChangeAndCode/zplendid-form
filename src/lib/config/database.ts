@@ -1,4 +1,4 @@
-import mysql from 'mysql2/promise';
+import sql from 'mssql';
 import dotenv from 'dotenv';
 
 // Cargar variables de entorno
@@ -6,11 +6,16 @@ dotenv.config({ path: '.env.local' });
 dotenv.config({ path: '.env.production' });
 
 export interface DatabaseConfig {
-  host: string;
+  server: string;
   user: string;
   password: string;
   database: string;
   port: number;
+  options: {
+    encrypt: boolean;
+    trustServerCertificate: boolean;
+    enableArithAbort: boolean;
+  };
 }
 
 // Función para validar variables de entorno requeridas
@@ -36,42 +41,48 @@ const getRequiredPort = (): number => {
 };
 
 const config: DatabaseConfig = {
-  host: getRequiredEnvVar('DB_HOST'),
+  server: getRequiredEnvVar('DB_HOST'),
   user: getRequiredEnvVar('DB_USER'),
   password: getRequiredEnvVar('DB_PASSWORD'),
   database: getRequiredEnvVar('DB_NAME'),
   port: getRequiredPort(),
+  options: {
+    encrypt: false, // Cambiar a true si usas SSL
+    trustServerCertificate: true, // Para desarrollo local
+    enableArithAbort: true
+  }
 };
 
 // Debug: Log configuration (sin mostrar password)
 console.log('🔧 Database config:', {
-  host: config.host,
+  server: config.server,
   user: config.user,
   database: config.database,
   port: config.port,
   hasPassword: !!config.password
 });
 
-let connection: mysql.Connection | null = null;
+let pool: sql.ConnectionPool | null = null;
 
-export const getConnection = async (): Promise<mysql.Connection> => {
-  if (!connection) {
+export const getConnection = async (): Promise<sql.ConnectionPool> => {
+  if (!pool) {
     try {
-      connection = await mysql.createConnection(config);
-      console.log('✅ Conexión a MySQL establecida correctamente');
+      pool = new sql.ConnectionPool(config);
+      await pool.connect();
+      console.log('✅ Conexión a SQL Server establecida correctamente');
     } catch (error) {
-      console.error('❌ Error al conectar con MySQL:', error);
+      console.error('❌ Error al conectar con SQL Server:', error);
       throw error;
     }
   }
-  return connection;
+  return pool;
 };
 
 export const closeConnection = async (): Promise<void> => {
-  if (connection) {
-    await connection.end();
-    connection = null;
-    console.log('🔌 Conexión a MySQL cerrada');
+  if (pool) {
+    await pool.close();
+    pool = null;
+    console.log('🔌 Conexión a SQL Server cerrada');
   }
 };
 
