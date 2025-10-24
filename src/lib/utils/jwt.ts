@@ -28,9 +28,14 @@ export class JWTUtils {
       return decoded;
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
-        throw new Error('Token expirado');
+        const expiredError = new Error('Token expirado') as Error & { code: string; expiredAt: Date };
+        expiredError.code = 'TOKEN_EXPIRED';
+        expiredError.expiredAt = error.expiredAt;
+        throw expiredError;
       } else if (error instanceof jwt.JsonWebTokenError) {
-        throw new Error('Token inválido');
+        const invalidError = new Error('Token inválido') as Error & { code: string };
+        invalidError.code = 'TOKEN_INVALID';
+        throw invalidError;
       } else {
         throw new Error('Error al verificar token');
       }
