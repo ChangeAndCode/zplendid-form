@@ -1,10 +1,10 @@
-import { ChangeEvent, useState, useEffect } from 'react';
+import { ChangeEvent, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import FormStep from '../organisms/FormStep';
 import TextareaField from '../molecules/TextareaField';
 import type { HealthFormData } from '../../hooks/useHealthForm';
 import { generatePDF } from '../../utils/pdfGenerator';
-import { getPatientId } from '../../utils/patientId';
+import { useAuth } from '../../hooks/useAuth';
 
 interface ConfirmationStepProps {
   formData: HealthFormData;
@@ -20,14 +20,17 @@ interface FieldSummary {
 
 export default function ConfirmationStep({ formData, onInputChange, onPrevious }: ConfirmationStepProps) {
   const { t, language } = useLanguage();
+  const { patientId } = useAuth();
   const [showPreview, setShowPreview] = useState(false);
-  const [patientId, setPatientId] = useState('');
-
-  useEffect(() => {
-    setPatientId(getPatientId());
-  }, []);
 
   const handleDownloadPDF = () => {
+    if (!patientId) {
+      alert(language === 'es' 
+        ? 'No se encontró el expediente del paciente. Por favor, intenta de nuevo.'
+        : 'Patient record not found. Please try again.');
+      return;
+    }
+
     try {
       const pdf = generatePDF(formData, language, patientId);
       const fileName = `zplendid_${patientId}_${formData.firstName}_${formData.lastName}.pdf`;

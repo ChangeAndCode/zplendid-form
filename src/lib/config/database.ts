@@ -13,12 +13,34 @@ export interface DatabaseConfig {
   port: number;
 }
 
+// Función para validar variables de entorno requeridas
+const getRequiredEnvVar = (name: string): string => {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`❌ Variable de entorno requerida no encontrada: ${name}`);
+  }
+  return value;
+};
+
+// Función para validar puerto
+const getRequiredPort = (): number => {
+  const portStr = process.env.DB_PORT;
+  if (!portStr) {
+    throw new Error('❌ Variable de entorno requerida no encontrada: DB_PORT');
+  }
+  const port = parseInt(portStr);
+  if (isNaN(port)) {
+    throw new Error(`❌ DB_PORT debe ser un número válido, recibido: ${portStr}`);
+  }
+  return port;
+};
+
 const config: DatabaseConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'db_zplendid',
-  port: parseInt(process.env.DB_PORT || '3306'),
+  host: getRequiredEnvVar('DB_HOST'),
+  user: getRequiredEnvVar('DB_USER'),
+  password: getRequiredEnvVar('DB_PASSWORD'),
+  database: getRequiredEnvVar('DB_NAME'),
+  port: getRequiredPort(),
 };
 
 // Debug: Log configuration (sin mostrar password)

@@ -10,6 +10,9 @@ export class AuthController {
    */
   static async register(request: NextRequest): Promise<NextResponse<AuthResponse>> {
     try {
+      // Asegurar que la tabla users existe automáticamente
+      await UserModel.createTable();
+      
       const body = await request.json();
       const userData: UserCreate = body;
 
@@ -79,6 +82,9 @@ export class AuthController {
    */
   static async login(request: NextRequest): Promise<NextResponse<AuthResponse>> {
     try {
+      // Asegurar que la tabla users existe automáticamente
+      await UserModel.createTable();
+      
       const body = await request.json();
       const { email, password }: UserLogin = body;
 
@@ -193,6 +199,9 @@ export class AuthController {
    */
   static async verifyToken(request: NextRequest): Promise<NextResponse<AuthResponse>> {
     try {
+      // Asegurar que la tabla users existe automáticamente
+      await UserModel.createTable();
+      
       const authHeader = request.headers.get('authorization');
       const token = JWTUtils.extractTokenFromHeader(authHeader);
 
@@ -203,7 +212,42 @@ export class AuthController {
         );
       }
 
-      const decoded = JWTUtils.verifyToken(token);
+      let decoded;
+      try {
+        decoded = JWTUtils.verifyToken(token);
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error) {
+          if (error.code === 'TOKEN_EXPIRED') {
+            return NextResponse.json(
+              { 
+                success: false, 
+                message: 'Token expirado', 
+                code: 'TOKEN_EXPIRED',
+                expiredAt: 'expiredAt' in error ? error.expiredAt : undefined
+              },
+              { status: 401 }
+            );
+          } else if (error.code === 'TOKEN_INVALID') {
+            return NextResponse.json(
+              { 
+                success: false, 
+                message: 'Token inválido', 
+                code: 'TOKEN_INVALID'
+              },
+              { status: 401 }
+            );
+          }
+        }
+        
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Error al verificar token' 
+          },
+          { status: 401 }
+        );
+      }
+
       const user = await UserModel.findById(decoded.userId);
 
       if (!user) {

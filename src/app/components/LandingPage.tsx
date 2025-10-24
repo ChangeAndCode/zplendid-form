@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
-import { getPatientId, formatPatientId, hasExistingPatientId } from '../utils/patientId';
+import { formatPatientId } from '../utils/patientId';
 import LanguageSwitcher from './organisms/LanguageSwitcher';
 import GlobalProgress from './organisms/GlobalProgress';
 import StepNumber from './atoms/StepNumber';
@@ -72,8 +72,6 @@ export default function LandingPage() {
   const { language } = useLanguage();
   const { isAuthenticated, isLoading, logout, patientId, getPatientRecord } = useAuth();
   const router = useRouter();
-  const [localPatientId, setLocalPatientId] = useState<string>('');
-  const [isReturning, setIsReturning] = useState(false);
   const [completedForms, setCompletedForms] = useState<string[]>([]);
 
   // Redirigir al login si no está autenticado
@@ -171,11 +169,6 @@ export default function LandingPage() {
     checkCompletedForms();
   }, [isAuthenticated, patientId]);
 
-  useEffect(() => {
-    const id = getPatientId();
-    setLocalPatientId(id);
-    setIsReturning(hasExistingPatientId());
-  }, []);
 
   // Mostrar carga mientras verifica autenticación
   if (isLoading) {
@@ -230,7 +223,7 @@ export default function LandingPage() {
           </p>
 
           {/* Patient ID Badge - minimalista */}
-          {(patientId || localPatientId) && (
+          {patientId && (
             <div className="inline-flex items-center gap-4 bg-white px-6 py-4 rounded-lg border border-gray-200 mb-6">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -238,19 +231,17 @@ export default function LandingPage() {
                 </span>
               </div>
               <span className="text-xl font-mono font-bold text-[#212e5c]">
-                {patientId || formatPatientId(localPatientId)}
+                {formatPatientId(patientId)}
               </span>
-              {(isReturning || patientId) && (
-                <span className="text-xs bg-green-500 text-white px-3 py-1 rounded-full font-medium">
-                  {language === 'es' ? 'Guardado' : 'Saved'}
-                </span>
-              )}
+              <span className="text-xs bg-green-500 text-white px-3 py-1 rounded-full font-medium">
+                {language === 'es' ? 'Guardado' : 'Saved'}
+              </span>
             </div>
           )}
         </div>
 
         {/* Global Progress Indicator */}
-        {isReturning && completedForms.length > 0 && (
+        {completedForms.length > 0 && (
           <GlobalProgress completedForms={completedForms} totalForms={4} />
         )}
 
