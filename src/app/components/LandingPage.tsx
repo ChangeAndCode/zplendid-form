@@ -245,6 +245,48 @@ export default function LandingPage() {
           <GlobalProgress completedForms={completedForms} totalForms={4} />
         )}
 
+        {/* Chat Assistant Button */}
+        <div className="mb-8">
+          <a
+            href="/chat"
+            className="group block w-full bg-gradient-to-r from-[#212e5c] to-[#1a2347] rounded-lg border border-[#212e5c] hover:from-[#1a2347] hover:to-[#0f1420] transition-all duration-200 text-left cursor-pointer shadow-lg hover:shadow-xl"
+          >
+            <div className="p-6 sm:p-8 lg:p-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-4 sm:gap-6 mb-4">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/10 rounded-full flex items-center justify-center text-2xl sm:text-3xl">
+                    🤖
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white group-hover:text-gray-100 transition-colors mb-2">
+                      {language === 'es' ? 'Asistente Conversacional' : 'Conversational Assistant'}
+                    </h3>
+                    <p className="text-sm sm:text-base text-blue-100 group-hover:text-white transition-colors">
+                      {language === 'es' 
+                        ? 'Completa tu cuestionario médico de forma natural y conversacional'
+                        : 'Complete your medical questionnaire in a natural and conversational way'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 sm:ml-8">
+                <span className="text-xs sm:text-sm text-blue-200 whitespace-nowrap">
+                  {language === 'es' ? '15-20 min' : '15-20 min'}
+                </span>
+                <svg 
+                  className="w-6 h-6 sm:w-8 sm:h-8 text-white group-hover:text-gray-100 group-hover:translate-x-1 transition-all" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </div>
+          </a>
+        </div>
+
         {/* Form Modules - minimalista */}
         <div className="space-y-4 mb-20">
           {formModules.map((module, index) => (

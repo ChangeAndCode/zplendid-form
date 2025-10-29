@@ -2,6 +2,7 @@ import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 
 // Cargar variables de entorno
+dotenv.config({ path: '.env' });
 dotenv.config({ path: '.env.local' });
 dotenv.config({ path: '.env.production' });
 
