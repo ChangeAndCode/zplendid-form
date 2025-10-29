@@ -130,7 +130,8 @@ export default function AuthExample() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="user">Usuario</option>
-                <option value="doctor">Doctor</option>
+                {/* El rol de doctor ahora solo se asigna desde el panel de administrador */}
+                {/* <option value="doctor">Doctor</option> */}
                 <option value="admin">Administrador</option>
               </select>
             </div>

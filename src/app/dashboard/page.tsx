@@ -13,8 +13,10 @@ export default function Dashboard() {
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/');
+    } else if (!isLoading && user && user.role === 'admin') {
+      router.push('/admin');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, user, router]);
 
   if (isLoading) {
     return (

@@ -26,7 +26,7 @@ export default function AuthLandingPage() {
     if (isAuthenticated && user) {
       // Redirigir según el rol del usuario
       if (user.role === 'admin') {
-        router.push('/admin/dashboard');
+        router.push('/admin');
       } else if (user.role === 'doctor') {
         router.push('/doctor/dashboard');
       } else {
@@ -200,9 +200,10 @@ export default function AuthLandingPage() {
                       <option value="user">
                         {language === 'es' ? 'Paciente' : 'Patient'}
                       </option>
-                      <option value="doctor">
+                      {/* El rol de doctor ahora solo se asigna desde el panel de administrador */}
+                      {/* <option value="doctor">
                         {language === 'es' ? 'Doctor' : 'Doctor'}
-                      </option>
+                      </option> */}
                       <option value="admin">
                         {language === 'es' ? 'Administrador' : 'Administrator'}
                       </option>
