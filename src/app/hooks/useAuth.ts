@@ -16,6 +16,7 @@ interface AuthResponse {
   message: string;
   user?: User;
   token?: string;
+  patientId?: string;
 }
 
 interface UseAuthReturn {
@@ -56,7 +57,6 @@ const clearFormDataFromStorage = (): void => {
   
   keysToRemove.forEach(key => {
     localStorage.removeItem(key);
-    console.log(`🗑️ Eliminado: ${key}`);
   });
 };
 
@@ -95,18 +95,19 @@ export const useAuth = (): UseAuthReturn => {
       const data: AuthResponse = await response.json();
 
       if (data.success && data.token && data.user) {
-        console.log('✅ Login exitoso, actualizando estado...');
         setToken(data.token);
         setUser(data.user);
         localStorage.setItem('token', data.token);
         
-        // Obtener el Patient ID de la base de datos
-        console.log('🔍 Login exitoso, obteniendo Patient ID...');
-        const patientId = await getPatientRecord();
-        console.log('🔍 Patient ID obtenido en login:', patientId);
-        setPatientId(patientId);
+        // Obtener el Patient ID de la base de datos usando el token directamente
+        if (data.patientId) {
+          setPatientId(data.patientId);
+        } else {
+          // Si no viene en la respuesta, obtenerlo usando el token
+          const patientId = await getPatientRecord();
+          setPatientId(patientId);
+        }
         
-        console.log('✅ Estado actualizado, usuario:', data.user, 'Patient ID:', patientId);
       }
 
       return data;
@@ -146,9 +147,14 @@ export const useAuth = (): UseAuthReturn => {
         setUser(data.user);
         localStorage.setItem('token', data.token);
         
-        // Obtener el Patient ID de la base de datos
-        const patientId = await getPatientRecord();
-        setPatientId(patientId);
+        // Obtener el Patient ID de la base de datos usando el token directamente
+        if (data.patientId) {
+          setPatientId(data.patientId);
+        } else {
+          // Si no viene en la respuesta, obtenerlo usando el token
+          const patientId = await getPatientRecord();
+          setPatientId(patientId);
+        }
       }
 
       return data;
@@ -166,7 +172,6 @@ export const useAuth = (): UseAuthReturn => {
 
   const logout = useCallback(async (): Promise<void> => {
     try {
-      console.log('🚪 Cerrando sesión...');
       if (token) {
         await fetch('/api/auth/logout', {
           method: 'POST',
@@ -178,7 +183,6 @@ export const useAuth = (): UseAuthReturn => {
     } catch (error) {
       console.error('Error en logout:', error);
     } finally {
-      console.log('🧹 Limpiando estado local...');
       setUser(null);
       setToken(null);
       setPatientId(null);
@@ -186,7 +190,6 @@ export const useAuth = (): UseAuthReturn => {
       // Limpiar todos los datos de formularios del localStorage
       clearFormDataFromStorage();
       localStorage.removeItem('token');
-      console.log('✅ Sesión cerrada completamente - Todos los datos de formularios eliminados');
     }
   }, [token]);
 
@@ -240,9 +243,7 @@ export const useAuth = (): UseAuthReturn => {
       if (data.success && data.user) {
         setUser(data.user);
         // Obtener el Patient ID de la base de datos
-        console.log('🔍 Usuario verificado, obteniendo Patient ID...');
         const patientId = await getPatientRecord();
-        console.log('🔍 Patient ID obtenido en verifyTokenWithToken:', patientId);
         setPatientId(patientId);
         setIsLoading(false);
         return true;
@@ -280,11 +281,9 @@ export const useAuth = (): UseAuthReturn => {
   const getPatientRecord = useCallback(async (): Promise<string | null> => {
     try {
       if (!token) {
-        console.log('🔍 No hay token para obtener Patient ID');
         return null;
       }
 
-      console.log('🔍 Obteniendo Patient ID de la base de datos...');
       const response = await fetch('/api/patient-record', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -292,15 +291,11 @@ export const useAuth = (): UseAuthReturn => {
       });
 
       const data = await response.json();
-      console.log('🔍 Respuesta del endpoint patient-record:', data);
 
       if (data.success && data.patientId) {
-        console.log('✅ Patient ID obtenido:', data.patientId);
         setPatientId(data.patientId);
         return data.patientId;
       }
-
-      console.log('❌ No se pudo obtener Patient ID');
       return null;
     } catch (error) {
       console.error('Error al obtener expediente:', error);
