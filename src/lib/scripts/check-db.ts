@@ -1,4 +1,8 @@
+import dotenv from 'dotenv';
 import { getConnection } from '../config/database';
+
+// Cargar variables de entorno
+dotenv.config({ path: '.env' });
 
 /**
  * Script para verificar la conexión a la base de datos
