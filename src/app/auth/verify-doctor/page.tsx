@@ -1,10 +1,18 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function VerifyDoctorPage() {
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">Cargando...</div>}>
+      <VerifyDoctorClient />
+    </Suspense>
+  );
+}
+
+function VerifyDoctorClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'pending' | 'success' | 'error'>('pending');
