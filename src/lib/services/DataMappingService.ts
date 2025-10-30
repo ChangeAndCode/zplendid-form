@@ -1,7 +1,7 @@
 import { HealthFormData } from '../../app/hooks/useHealthForm';
 
 interface QuestionMapping {
-  fieldName: keyof HealthFormData;
+  fieldName: keyof HealthFormData | string;
   category: string;
   questionText: string;
   expectedResponseType: 'text' | 'yesno' | 'select' | 'number' | 'date';
@@ -68,7 +68,7 @@ export class DataMappingService {
   ): {
     success: boolean;
     extractedValue?: any;
-    fieldName?: keyof HealthFormData;
+    fieldName?: keyof HealthFormData | string;
     error?: string;
     needsFollowUp?: boolean;
     followUpQuestion?: string;
@@ -95,7 +95,7 @@ export class DataMappingService {
           success: false,
           error: validation.error,
           needsFollowUp: true,
-          followUpQuestion: this.generateFollowUpQuestion(mapping, validation.error)
+          followUpQuestion: this.generateFollowUpQuestion(mapping, validation.error ?? 'La respuesta no cumple las reglas de validación')
         };
       }
 

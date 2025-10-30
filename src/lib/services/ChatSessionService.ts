@@ -55,8 +55,16 @@ class ChatSessionService {
     await this.connect();
   }
 
-  async createSession(patientId: string = 'guest'): Promise<ChatSession> {
+  private async getCollection(): Promise<Collection<ChatSession>> {
     await this.ensureConnection();
+    if (!this.collection) {
+      throw new Error('MongoDB collection is not initialized');
+    }
+    return this.collection;
+  }
+
+  async createSession(patientId: string = 'guest'): Promise<ChatSession> {
+    const collection = await this.getCollection();
 
     const sessionId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const session: ChatSession = {
@@ -70,20 +78,19 @@ class ChatSessionService {
       updatedAt: new Date()
     };
 
-    await this.collection.insertOne(session);
+    await collection.insertOne(session);
     return session;
   }
 
   async getSession(sessionId: string): Promise<ChatSession | null> {
-    await this.ensureConnection();
-
-    return await this.collection.findOne({ id: sessionId });
+    const collection = await this.getCollection();
+    return await collection.findOne({ id: sessionId });
   }
 
   async updateSession(sessionId: string, updates: Partial<ChatSession>): Promise<ChatSession | null> {
-    await this.ensureConnection();
+    const collection = await this.getCollection();
 
-    const result = await this.collection.findOneAndUpdate(
+    const result = await collection.findOneAndUpdate(
       { id: sessionId },
       { 
         $set: { 
@@ -98,9 +105,9 @@ class ChatSessionService {
   }
 
   async addMessage(sessionId: string, message: Message): Promise<ChatSession | null> {
-    await this.ensureConnection();
+    const collection = await this.getCollection();
 
-    const result = await this.collection.findOneAndUpdate(
+    const result = await collection.findOneAndUpdate(
       { id: sessionId },
       { 
         $push: { messages: message },
@@ -113,9 +120,9 @@ class ChatSessionService {
   }
 
   async updateExtractedData(sessionId: string, data: Record<string, any>): Promise<ChatSession | null> {
-    await this.ensureConnection();
+    const collection = await this.getCollection();
 
-    const result = await this.collection.findOneAndUpdate(
+    const result = await collection.findOneAndUpdate(
       { id: sessionId },
       { 
         $set: { 
@@ -130,9 +137,9 @@ class ChatSessionService {
   }
 
   async getPatientSessions(patientId: string): Promise<ChatSession[]> {
-    await this.ensureConnection();
+    const collection = await this.getCollection();
 
-    return await this.collection
+    return await collection
       .find({ patientId })
       .sort({ createdAt: -1 })
       .toArray();
