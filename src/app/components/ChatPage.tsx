@@ -246,7 +246,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex flex-col">
       {/* Header minimalista */}
       <div className="bg-white border-b border-gray-200 flex-shrink-0">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex justify-between items-center">
@@ -280,20 +280,28 @@ export default function ChatPage() {
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex items-end ${message.type === 'user' ? 'justify-end' : 'justify-start'} gap-2`}
             >
+              {message.type === 'assistant' && (
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#212e5c] text-white grid place-items-center shadow">
+                  {/* Robot icon */}
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 3v3m-7 6h14M6 9h12a2 2 0 012 2v5a3 3 0 01-3 3H7a3 3 0 01-3-3v-5a2 2 0 012-2zm3 5h.01M15 14h.01"/>
+                  </svg>
+                </div>
+              )}
               <div
-                className={`max-w-xs sm:max-w-md lg:max-w-lg px-4 py-3 rounded-lg ${
+                className={`max-w-xs sm:max-w-md lg:max-w-lg px-4 py-3 rounded-2xl shadow ${
                   message.type === 'user'
-                    ? 'bg-[#212e5c] text-white'
-                    : 'bg-white border border-gray-200 text-gray-900'
+                    ? 'bg-[#212e5c] text-white rounded-br-sm'
+                    : 'bg-white border border-gray-200 text-gray-900 rounded-bl-sm'
                 }`}
               >
                 <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap">
                   {message.content}
                 </p>
-                <p className={`text-xs mt-2 ${
-                  message.type === 'user' ? 'text-blue-100' : 'text-gray-500'
+                <p className={`text-[11px] mt-2 ${
+                  message.type === 'user' ? 'text-blue-100/80' : 'text-gray-500'
                 }`}>
                   {message.timestamp.toLocaleTimeString([], { 
                     hour: '2-digit', 
@@ -301,6 +309,14 @@ export default function ChatPage() {
                   })}
                 </p>
               </div>
+              {message.type === 'user' && (
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white border border-gray-300 text-[#212e5c] grid place-items-center shadow">
+                  {/* User icon */}
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M16 14a4 4 0 10-8 0m8 0a4 4 0 11-8 0m8 0v1a4 4 0 01-4 4m0 0a4 4 0 01-4-4v-1m4-7a3 3 0 110-6 3 3 0 010 6z"/>
+                  </svg>
+                </div>
+              )}
             </div>
           ))}
           
