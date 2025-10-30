@@ -93,7 +93,7 @@ export default function ChatPage() {
         const welcomeMessage: Message = {
           id: Date.now().toString(),
           type: 'assistant',
-          content: 'Hi there! I\'m your AI medical assistant. To get started, what\'s your first name?',
+          content: 'Hi there! I\'m your AI medical assistant. To get started, could you share your first and last name and date of birth (MM/DD/YYYY)?',
           timestamp: new Date()
         };
         setMessages([welcomeMessage]);
@@ -123,7 +123,7 @@ export default function ChatPage() {
           const welcomeMessage: Message = {
             id: Date.now().toString(),
             type: 'assistant',
-            content: 'Hi there! I\'m your AI medical assistant. To get started, what\'s your first name?',
+            content: 'Hi there! I\'m your AI medical assistant. To get started, could you share your first and last name and date of birth (MM/DD/YYYY)?',
             timestamp: new Date()
           };
           setMessages([welcomeMessage]);
@@ -132,7 +132,7 @@ export default function ChatPage() {
         const welcomeMessage: Message = {
           id: Date.now().toString(),
           type: 'assistant',
-          content: 'Hi there! I\'m your AI medical assistant. To get started, what\'s your first name?',
+          content: 'Hi there! I\'m your AI medical assistant. To get started, could you share your first and last name and date of birth (MM/DD/YYYY)?',
           timestamp: new Date()
         };
         setMessages([welcomeMessage]);
@@ -143,7 +143,7 @@ export default function ChatPage() {
         const welcomeMessage: Message = {
           id: Date.now().toString(),
           type: 'assistant',
-          content: 'Hi there! I\'m your AI medical assistant. To get started, what\'s your first name?',
+          content: 'Hi there! I\'m your AI medical assistant. To get started, could you share your first and last name and date of birth (MM/DD/YYYY)?',
           timestamp: new Date()
         };
         setMessages([welcomeMessage]);

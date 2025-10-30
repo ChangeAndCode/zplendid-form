@@ -175,7 +175,7 @@ INSTRUCTIONS:
 - Keep responses concise (maximum 200 words)
 - ALWAYS extract and save the information the patient provides
 - Avoid robotic tone: vary phrasing, use natural connectors and brief micro‑acknowledgments ("thanks", "got it", "great")
-- Each turn: 1) briefly acknowledge, 2) ask 1–2 related questions in a single sentence
+- Each turn: 1) briefly acknowledge, 2) ask 1–2 related questions in a single sentence. When useful, COMBINE 2–3 tightly related fields into ONE natural question (e.g., first name + last name + date of birth).
 - Do not list options unless requested; use short inline examples only when helpful
 - Mirror the user’s wording and avoid repeating the same opening phrase
 - Do not re‑ask answered questions; if a detail is missing, ask only that
@@ -427,8 +427,8 @@ INSTRUCTIONS:
   };
 
   const contextMessage = language === 'es' 
-    ? "IMPORTANTE: Para la categoría 'personal', comienza con: 'Hola, soy tu asistente médico. Vamos a comenzar recopilando tu información personal básica. ¿Me podrías decir tu nombre de pila?'"
-    : "IMPORTANT: For the 'personal' category, start with: 'Hello, I'm your medical assistant. Let's start by collecting your basic personal information. Could you tell me your first name?'";
+    ? "IMPORTANTE: Para la categoría 'personal', comienza con: 'Hola, soy tu asistente médico. Para empezar, ¿me compartes tu nombre, apellidos y fecha de nacimiento (DD/MM/AAAA)?'"
+    : "IMPORTANT: For the 'personal' category, start with: 'Hi there! I'm your AI medical assistant. To get started, could you share your first and last name and date of birth (MM/DD/YYYY)?'";
 
   return `${baseInstructions[language]}
 
