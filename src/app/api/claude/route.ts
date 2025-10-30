@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   try {
     const { message, conversationHistory = [], category, language = 'en', patientId, sessionId }: ClaudeRequest = await request.json();
 
-    const API_KEY = process.env.ANTHROPIC_API_KEY;
+    const API_KEY = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_APT_KEY;
     
     if (!API_KEY) {
       return NextResponse.json(
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250929',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 1000,
         messages: messages
       })
