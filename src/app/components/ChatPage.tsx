@@ -50,17 +50,55 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  // Inicializar chat al cargar
+  // Inicializar chat al cargar (muestra saludo incluso sin patientId)
   useEffect(() => {
-    if (isAuthenticated && patientId && messages.length === 0) {
+    if (isAuthenticated && messages.length === 0) {
       initializeChat();
     }
-  }, [isAuthenticated, patientId]);
+  }, [isAuthenticated]);
+
+  // Crear sesión cuando patientId esté disponible
+  useEffect(() => {
+    const createSessionIfNeeded = async () => {
+      try {
+        if (!isAuthenticated || !patientId || chatSession) return;
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const response = await fetch('/api/claude', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            message: 'start',
+            patientId: patientId
+          })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setChatSession(data.session);
+        }
+      } catch (error) {
+        console.error('Error creating session:', error);
+      }
+    };
+    createSessionIfNeeded();
+  }, [isAuthenticated, patientId, chatSession]);
 
   const initializeChat = async () => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token || !patientId) {
+        const welcomeMessage: Message = {
+          id: Date.now().toString(),
+          type: 'assistant',
+          content: 'Hi there! I\'m your AI medical assistant. To get started, what\'s your first name?',
+          timestamp: new Date()
+        };
+        setMessages([welcomeMessage]);
+        return;
+      }
 
       const response = await fetch('/api/claude', {
         method: 'POST',
@@ -76,19 +114,40 @@ export default function ChatPage() {
 
       if (response.ok) {
         const data = await response.json();
+        // Si el backend devuelve sesión (en start), solo guardamos la sesión.
+        if (data.session) {
+          setChatSession(data.session);
+        }
+        // Asegurar mensaje de bienvenida si aún no existe
+        if (messages.length === 0) {
+          const welcomeMessage: Message = {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: 'Hi there! I\'m your AI medical assistant. To get started, what\'s your first name?',
+            timestamp: new Date()
+          };
+          setMessages([welcomeMessage]);
+        }
+      } else {
         const welcomeMessage: Message = {
           id: Date.now().toString(),
           type: 'assistant',
-          content: data.response || (language === 'es' 
-            ? 'Hola, soy tu asistente médico. Vamos a comenzar recopilando tu información personal básica. ¿Me podrías decir tu nombre de pila?'
-            : 'Hello, I\'m your medical assistant. Let\'s start by collecting your basic personal information. Could you tell me your first name?'),
+          content: 'Hi there! I\'m your AI medical assistant. To get started, what\'s your first name?',
           timestamp: new Date()
         };
         setMessages([welcomeMessage]);
-        setChatSession(data.session);
       }
     } catch (error) {
       console.error('Error initializing chat:', error);
+      if (messages.length === 0) {
+        const welcomeMessage: Message = {
+          id: Date.now().toString(),
+          type: 'assistant',
+          content: 'Hi there! I\'m your AI medical assistant. To get started, what\'s your first name?',
+          timestamp: new Date()
+        };
+        setMessages([welcomeMessage]);
+      }
     }
   };
 

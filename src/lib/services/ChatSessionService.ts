@@ -55,13 +55,13 @@ class ChatSessionService {
     await this.connect();
   }
 
-  async createSession(patientId: string): Promise<ChatSession> {
+  async createSession(patientId: string = 'guest'): Promise<ChatSession> {
     await this.ensureConnection();
 
     const sessionId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const session: ChatSession = {
       id: sessionId,
-      patientId,
+      patientId: patientId || 'guest',
       messages: [],
       currentCategory: 'personal',
       completedCategories: [],

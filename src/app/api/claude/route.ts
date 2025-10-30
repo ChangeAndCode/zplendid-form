@@ -35,9 +35,13 @@ export async function POST(request: NextRequest) {
 
     // Manejar sesión de chat
     let currentSession;
-    if (message === 'start' && patientId) {
-      // Crear nueva sesión
-      currentSession = await chatSessionService.createSession(patientId);
+    if (message === 'start') {
+      // Crear nueva sesión (usa 'guest' si no hay patientId) y responder sin invocar a Claude
+      currentSession = await chatSessionService.createSession(patientId || 'guest');
+      return NextResponse.json({
+        success: true,
+        session: currentSession
+      });
     } else if (sessionId) {
       // Obtener sesión existente
       currentSession = await chatSessionService.getSession(sessionId);
@@ -47,11 +51,12 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
+    } else if (patientId) {
+      // Si hay patientId pero no sessionId, crear una nueva sesión
+      currentSession = await chatSessionService.createSession(patientId);
     } else {
-      return NextResponse.json(
-        { error: 'Session ID or patient ID required' },
-        { status: 400 }
-      );
+      // Sin sessionId ni patientId: crear sesión guest
+      currentSession = await chatSessionService.createSession('guest');
     }
 
     // Construir el prompt base
