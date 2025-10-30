@@ -53,26 +53,42 @@ console.log('🔧 Database config:', {
   hasPassword: !!config.password
 });
 
-let connection: mysql.Connection | null = null;
+// Pool singleton para entornos serverless (Render) — evita "connection is in closed state"
+let pool: mysql.Pool | null = null;
 
-export const getConnection = async (): Promise<mysql.Connection> => {
-  if (!connection) {
+function createPool(): mysql.Pool {
+  return mysql.createPool({
+    host: config.host,
+    user: config.user,
+    password: config.password,
+    database: config.database,
+    port: config.port,
+    waitForConnections: true,
+    connectionLimit: 5,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0
+  });
+}
+
+export const getConnection = async (): Promise<mysql.Pool> => {
+  if (!pool) {
     try {
-      connection = await mysql.createConnection(config);
-      console.log('✅ Conexión a MySQL establecida correctamente');
+      pool = createPool();
+      console.log('✅ Pool MySQL inicializado');
     } catch (error) {
-      console.error('❌ Error al conectar con MySQL:', error);
+      console.error('❌ Error al crear el pool de MySQL:', error);
       throw error;
     }
   }
-  return connection;
+  return pool;
 };
 
 export const closeConnection = async (): Promise<void> => {
-  if (connection) {
-    await connection.end();
-    connection = null;
-    console.log('🔌 Conexión a MySQL cerrada');
+  if (pool) {
+    await pool.end();
+    pool = null;
+    console.log('🔌 Pool MySQL cerrado');
   }
 };
 
