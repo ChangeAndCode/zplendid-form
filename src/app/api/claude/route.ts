@@ -69,9 +69,9 @@ export async function POST(request: NextRequest) {
       content: msg.content
     }));
     
-    const messages = [
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
       {
-        role: 'user' as const,
+        role: 'user',
         content: `${basePrompt}\n\nUser message: ${message}`
       }
     ];
@@ -230,7 +230,7 @@ INSTRUCTIONS:
       - Número de teléfono del contacto de emergencia
       
       AGRUPA estas preguntas de forma natural. Por ejemplo: "¿Me podrías dar el nombre completo de tu contacto de emergencia y su relación contigo?"`,
-      weightHistory: `Estás recopilando el historial de reducción de peso del paciente. Preguntas disponibles:
+      weightLossHistory: `Estás recopilando el historial de reducción de peso del paciente. Preguntas disponibles:
       - ¿Ha tenido cirugía de pérdida de peso anteriormente? (Sí/No)
       - Nombre del cirujano (si aplica)
       - ¿Ha sido consultado sobre cirugía de pérdida de peso? (Sí/No)
@@ -430,9 +430,13 @@ INSTRUCTIONS:
     ? "IMPORTANTE: Para la categoría 'personal', comienza con: 'Hola, soy tu asistente médico. Vamos a comenzar recopilando tu información personal básica. ¿Me podrías decir tu nombre de pila?'"
     : "IMPORTANT: For the 'personal' category, start with: 'Hello, I'm your medical assistant. Let's start by collecting your basic personal information. Could you tell me your first name?'";
 
+  // Acceso seguro a la categoría dinámica evitando errores de tipo en TS
+  const ctxByLang = (categoryContext as any)[language] as Record<string, string>;
+  const contextForCategory = (category && ctxByLang[category]) ? ctxByLang[category] : ctxByLang.general;
+
   return `${baseInstructions[language]}
 
-CURRENT CONTEXT: ${categoryContext[language][category] || categoryContext[language].general}
+CURRENT CONTEXT: ${contextForCategory}
 
 ${contextMessage}`;
 }

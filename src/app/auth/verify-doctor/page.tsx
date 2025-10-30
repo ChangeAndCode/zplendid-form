@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function VerifyDoctorPage() {
+function VerifyDoctorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'pending' | 'success' | 'error'>('pending');
@@ -17,7 +17,6 @@ export default function VerifyDoctorPage() {
       setStatus('error');
     }
   }, [email]);
-
 
   if (!email) {
     return (
@@ -99,6 +98,14 @@ export default function VerifyDoctorPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function VerifyDoctorPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">Cargando...</div>}>
+      <VerifyDoctorContent />
+    </Suspense>
   );
 }
 
