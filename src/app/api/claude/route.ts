@@ -425,17 +425,228 @@ INSTRUCTIONS:
       - Date of birth
       - Age
       - Gender
+      - Complete address
+      - City
+      - Country
+      - State/Province
+      - Zip code
       
       Ask questions conversationally, one by one, and confirm each response before continuing.`,
+      survey: `You are collecting information about how the patient heard about us. Available questions:
+      - How did they hear about us (Instagram, Facebook, Google, Referred, Other)
+      - If they chose "Other", specify how
+      
+      Ask questions conversationally and naturally.`,
+      contact: `You are collecting the patient's contact information. Available questions:
+      - Phone number
+      - Email  
+      - Preferred contact method (Text, Call, Email)
+      
+      GROUP these questions in one interaction to make it more natural. For example: "Could you give me your phone number and email?"`,
+      work: `You are collecting the patient's work and educational information. Available questions:
+      - Current occupation
+      - Employer
+      - Education level
+      
+      GROUP these questions in one interaction to make it more natural. For example: "Could you tell me what your current occupation and education level are?"`,
+      health: `You are collecting health metrics from the patient to calculate BMI. Available questions:
+      - Height in feet and inches
+      - Weight in pounds
+      - Height in centimeters (optional)
+      - Weight in kilograms (optional)
+      - BMI (automatically calculated)
+      
+      GROUP these questions naturally. For example: "To calculate your BMI, could you tell me your height in feet and inches and your weight in pounds?"`,
+      emergency: `You are collecting the patient's emergency contact information. Available questions:
+      - Emergency contact first name
+      - Emergency contact last name
+      - Relationship to the patient
+      - Emergency contact phone number
+      
+      GROUP these questions naturally. For example: "Could you give me the full name of your emergency contact and their relationship to you?"`,
+      weightHistory: `You are collecting the patient's weight reduction history. Available questions:
+      - Have you had weight loss surgery before? (Yes/No)
+      - Surgeon's name (if applicable)
+      - Have you been consulted about weight loss surgery? (Yes/No)
+      - Type of surgery or consultation (if applicable)
+      
+      Ask questions conversationally and handle conditional responses naturally.`,
+      familyHistory: `You are collecting the patient's family history. Available questions:
+      - Heart disease, diabetes, alcoholism, lung problems
+      - Gallstones, malignant hyperthermia, pulmonary edema
+      - High blood pressure, liver problems, bleeding disorders
+      - Mental illness, cancer
+      
+      GROUP these questions in one interaction to make it more natural. If the patient says "No" to all, acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions like "is there anything else?".`,
+      medicalHistory: `You are collecting the patient's personal medical history. Available questions:
+      - Sleep apnea (Yes/No)
+      - Diabetes (Yes/No)
+      - Insulin use (if they have diabetes)
+      - CPAP use (if they have sleep apnea)
+      - BiPAP use (if they use CPAP)
+      
+      GROUP these questions naturally. For example: "Have you been diagnosed with sleep apnea or diabetes?"`,
+      additionalMedical: `You are collecting other medical conditions from the patient. Available questions:
+      - Other medical conditions or hospitalizations (non-surgical)
+      
+      Ask this question openly and naturally.`,
+      surgicalInterest: `You are collecting the patient's surgical interest. Available questions:
+      - Type of surgery of interest (first-time bariatric, revisional bariatric, primary plastic, post-bariatric plastic)
+      - Specific surgery name (according to the selected type)
+      
+      Ask questions conversationally, guiding the user through the options and asking for specific details when necessary.`,
+      weightHistory: `You are collecting the patient's weight history. Available questions:
+      - Highest weight and date
+      - Surgery weight (if applicable)
+      - Lowest weight and date
+      - Current weight and time maintained
+      - Goal weight and target date
+      - Weight regained, date and time (if applicable)
+      
+      GROUP these questions naturally. For example: "What has been your highest weight and when was it?"`,
+      surgeryDetails: `You are collecting the patient's surgery details. Available questions:
+      - Stage of surgery process (just starting, consultation scheduled, pre-op appointments, ready to schedule, surgery scheduled)
+      - Surgeon preference (no preference, specific surgeon, specific clinic, other)
+      - Additional procedures of interest
+      - Estimated surgery date
+      
+      Ask questions conversationally, explaining the available options.`,
+      gerdInformation: `You are collecting information about the patient's gastroesophageal reflux disease (GERD). Available questions:
+      - Frequency of heartburn (per week)
+      - Frequency of regurgitation (per week)
+      - Frequency of upper stomach pain (per week)
+      - Frequency of nausea (per week)
+      - Frequency of difficulty sleeping due to GERD (per week)
+      - Frequency of additional GERD medication (per week)
+      - If upper GI endoscopy, esophageal manometry or 24-hour pH monitoring has been performed, and their dates and findings
+      
+      GROUP the GERD symptom frequency questions in one interaction. Then, ask about GERD diagnostic tests, grouping the 'when' and 'findings' questions if the answer is 'yes'.`,
+      currentMedicalConditions: `You are collecting the patient's current medical conditions. Available questions:
+      - High blood pressure (Yes/No)
+      - Sleep apnea (Yes/No)
+      - Urinary conditions (Yes/No + details if applicable)
+      - Muscular conditions (Yes/No + details if applicable)
+      - Neurological conditions (Yes/No + details if applicable)
+      - Blood disorders (Yes/No + details if applicable)
+      - Endocrine conditions (Yes/No + details if applicable)
+      
+      GROUP the main questions in one interaction. If the patient says "No" to a condition, acknowledge briefly and IMMEDIATELY move to the next question or section. ONLY ask for details if the answer is 'Yes'. NEVER ask open-ended questions like "is there anything else?".`,
+      psychiatricConditions: `You are collecting information about the patient's psychiatric conditions. Available questions:
+      - Have you ever been in a psychiatric hospital? (Yes/No)
+      - Have you ever attempted suicide? (Yes/No)
+      - Have you ever been physically abused? (Yes/No)
+      - Have you ever seen a psychiatrist or counselor? (Yes/No)
+      - Have you ever taken medications for psychiatric problems or depression? (Yes/No)
+      - Have you ever been in a chemical dependency program? (Yes/No)
+      
+      GROUP these questions naturally in one or two interactions. If the patient says "No" to all or some, acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions like "is there anything else?".`,
+      gastrointestinalConditions: `You are collecting information about the patient's gastrointestinal conditions. Available questions:
+      - Do you have any gastrointestinal conditions? (Yes/No + details if applicable)
+      
+      If the answer is 'Yes', ask for specific details. If the answer is 'No', acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions.`,
+      headAndNeckConditions: `You are collecting information about the patient's head and neck conditions. Available questions:
+      - Do you have any head and neck conditions? (Yes/No + details if applicable)
+      
+      If the answer is 'Yes', ask for specific details. If the answer is 'No', acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions.`,
+      skinConditions: `You are collecting information about the patient's skin conditions. Available questions:
+      - Do you have any skin conditions? (Yes/No + details if applicable)
+      
+      If the answer is 'Yes', ask for specific details. If the answer is 'No', acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions.`,
+      constitutionalConditions: `You are collecting information about the patient's constitutional conditions. Available questions:
+      - Have you experienced hair loss? (Yes/No)
+      
+      Ask this question directly.`,
+      infectiousDiseases: `You are collecting information about the patient's infectious diseases. Available questions:
+      - Have you ever had hepatitis? (Yes/No)
+      - Do you have HIV? (Yes/No)
+      
+      GROUP these questions naturally.`,
+      bloodTransfusion: `You are collecting information about the patient's blood transfusions. Available questions:
+      - Do you refuse blood transfusions? (Yes/No)
+      
+      Ask this question directly.`,
+      socialHistory: `You are collecting the patient's social history regarding tobacco, alcohol, drug, and caffeine use. Available questions:
+      - TOBACCO: Do you currently smoke? (Yes/No), cigarettes/packs per day, snuff/chewing tobacco, vape/e-cigarette, years of use, if quit how long ago
+      - ALCOHOL: Do you currently consume alcohol? (Yes/No), times per week, drinks each time, years of consumption, if quit how long ago, is anyone concerned about the amount?
+      - DRUGS: Do you currently use street drugs? (Yes/No), which drugs, frequency, if quit how long ago
+      - CAFFEINE: Do you drink caffeinated beverages? (Yes/No), cups per day, type of drink; do you drink carbonated beverages? types and amount per day
+      
+      GROUP tobacco questions in 1-2 turns, then alcohol in 1-2 turns, then drugs in 1 turn, then caffeine in 1-2 turns. Skip sub-questions if main answer is 'No'. If the patient says "No" to all substances, acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions like "Is there anything else?" DURING the questionnaire.`,
+      dietaryHabits: `You are collecting the patient's dietary habits. Available questions:
+      - How often do you eat sweets?
+      - How often do you eat fast food?
+      
+      GROUP these questions in one natural interaction.`,
+      otherSocials: `You are collecting information about other social substances and referrals. Available questions:
+      - Do you use marijuana products? (Yes/No)
+      - Do you use aspirin products? (Yes/No)
+      - Do you use sexual hormones? (Yes/No)
+      - Other substances (Specify)
+      - Referral name (if applicable)
+      
+      GROUP these questions in one natural interaction.`,
+      surgicalHistory: `You are collecting the patient's past surgical history. Available questions:
+      - Past surgical history
+      
+      Ask this question directly and naturally.`,
+      womenOnly: `You are collecting information specific to women. Available questions:
+      - Date of menstrual cycle
+      - Do you use any hormonal contraception? (Yes/No)
+      - List pregnancies, dates and outcomes
+      
+      GROUP these questions in one natural interaction, but only ask if the patient is female.`,
+      medications: `You are collecting the patient's current medications. Available questions:
+      - Current medications
+      
+      Ask this question directly and naturally.`,
+      allergies: `You are collecting the patient's allergies. Available questions:
+      - Allergies
+      
+      Ask this question directly and naturally.`,
+      dietProgram: `You are collecting information about the patient's diet program. Available questions:
+      - What is the name of the diet?
+      - When did you start it?
+      - How long did you follow it?
+      - How much weight did you lose?
+      - If there was weight regain, how much was it?
+      
+      GROUP these questions in one natural interaction.`,
+      pgwbi: `You are collecting the Psychological General Well-Being Index (PGWBI) information. Available questions:
+      - Have you been bothered by nervousness or your "nerves"? (during the past month)
+      - How much energy, pop, or vitality did you have or feel? (during the past month)
+      - I felt downhearted and blue (during the past month)
+      - Were you generally tense – or did you feel any tension? (during the past month)
+      - How happy, satisfied, or pleased have you been with your personal life? (during the past month)
+      - Did you feel healthy enough to carry out the things you like to do or had to do? (during the past month)
+      - Have you felt so sad, discouraged, hopeless, or had so many problems that you wondered if anything was worthwhile? (during the past month)
+      - I woke up feeling fresh and rested during the past month?
+      - Have you been concerned, worried, or had any fears about your health? (during the past month)
+      - Have you had any reason to wonder if you were losing your mind, or losing control over the way you act, talk, think, feel or of your memory? (during the past month)
+      - My daily life was full of things that were interesting to me during the past month?
+      - Did you feel active, vigorous, or dull, sluggish? (during the past month)
+      - Have you been anxious, worried, or upset? (during the past month)
+      - I was emotionally stable and sure of myself during the past month?
+      - Did you feel relaxed, at ease, or high strung, tight, or keyed-up? (during the past month)
+      - I felt cheerful, lighthearted during the past month?
+      - I felt tired, worn out, used up or exhausted during the past month?
+      - Have you been under or felt you were under any strain, stress, or pressure? (during the past month)
+      
+      GROUP these questions in 4-5 natural interactions. These are psychological well-being questions about the past month.`,
+      additionalComments: `You are collecting any additional comments from the patient. Available questions:
+      - Additional comments
+      
+      Ask this question directly and naturally. This is optional.`,
+      termsAndConditions: `You are confirming the patient has read and accepted the terms and conditions. Available questions:
+      - I have read and accepted the terms and conditions
+      
+      Ask this question directly and confirm acceptance. This is the LAST question of the questionnaire. AFTER the patient accepts the terms and conditions, the questionnaire is COMPLETE. ONLY THEN can you ask open-ended questions like "Is there anything else you'd like to discuss?" or "Do you have any questions for me?"`,
       medical: "You are collecting detailed medical history from the patient.",
       surgical: "You are collecting information about the patient's surgical interest.",
       weight: "You are collecting the patient's weight history."
     }
   };
 
-  const contextMessage = language === 'es' 
-    ? "IMPORTANTE: Para la categoría 'personal', comienza con: 'Hola, soy tu asistente médico. Para empezar, ¿me compartes tu nombre, apellidos y fecha de nacimiento (DD/MM/AAAA)?'"
-    : "IMPORTANT: For the 'personal' category, start with: 'Hi there! I'm your AI medical assistant. To get started, could you share your first and last name and date of birth (MM/DD/YYYY)?'";
+  const contextMessage = "IMPORTANT: For the 'personal' category, start with: 'Hi there! I'm your AI medical assistant. To get started, could you share your first and last name and date of birth (MM/DD/YYYY)?'";
 
   return `${baseInstructions[language]}
 
