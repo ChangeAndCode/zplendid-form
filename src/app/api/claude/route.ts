@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       content: msg.content
     }));
     
-    const messages = [
+    const messages: Array<{role: 'user' | 'assistant', content: string}> = [
       {
         role: 'user' as const,
         content: `${basePrompt}\n\nUser message: ${message}`
@@ -244,7 +244,7 @@ INSTRUCTIONS:
       - Número de teléfono del contacto de emergencia
       
       AGRUPA estas preguntas de forma natural. Por ejemplo: "¿Me podrías dar el nombre completo de tu contacto de emergencia y su relación contigo?"`,
-      weightHistory: `Estás recopilando el historial de reducción de peso del paciente. Preguntas disponibles:
+      previousWeightReduction: `Estás recopilando el historial de reducción de peso del paciente. Preguntas disponibles:
       - ¿Ha tenido cirugía de pérdida de peso anteriormente? (Sí/No)
       - Nombre del cirujano (si aplica)
       - ¿Ha sido consultado sobre cirugía de pérdida de peso? (Sí/No)
@@ -471,7 +471,7 @@ INSTRUCTIONS:
       - Emergency contact phone number
       
       GROUP these questions naturally. For example: "Could you give me the full name of your emergency contact and their relationship to you?"`,
-      weightHistory: `You are collecting the patient's weight reduction history. Available questions:
+      previousWeightReduction: `You are collecting the patient's weight reduction history. Available questions:
       - Have you had weight loss surgery before? (Yes/No)
       - Surgeon's name (if applicable)
       - Have you been consulted about weight loss surgery? (Yes/No)
@@ -655,9 +655,11 @@ INSTRUCTIONS:
 
   const contextMessage = "IMPORTANT: For the 'personal' category, start with: 'Hi there! I'm your AI medical assistant. To get started, could you share your first and last name and date of birth (MM/DD/YYYY)?'";
 
+  const context = (categoryContext[language] as Record<string, string>)[category] || (categoryContext[language] as Record<string, string>).general;
+  
   return `${baseInstructions[language]}
 
-CURRENT CONTEXT: ${categoryContext[language][category] || categoryContext[language].general}
+CURRENT CONTEXT: ${context}
 
 ${contextMessage}`;
 }
