@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
 import LanguageSwitcher from './organisms/LanguageSwitcher';
+import EmotionDetector from './EmotionDetector';
 
 interface Message {
   id: string;
@@ -273,10 +274,12 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Chat Container */}
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+      {/* Main Content Container - Two Columns */}
+      <div className="flex-1 flex gap-4 max-w-7xl mx-auto w-full px-4 sm:px-6 py-4">
+        {/* Chat Container - Left Side */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {messages.map((message) => (
             <div
               key={message.id}
@@ -362,6 +365,14 @@ export default function ChatPage() {
             >
               {language === 'es' ? 'Enviar' : 'Send'}
             </button>
+          </div>
+        </div>
+        </div>
+
+        {/* Emotion Detector - Right Side */}
+        <div className="hidden lg:block w-80 flex-shrink-0">
+          <div className="sticky top-4 h-[calc(100vh-8rem)]">
+            <EmotionDetector />
           </div>
         </div>
       </div>
