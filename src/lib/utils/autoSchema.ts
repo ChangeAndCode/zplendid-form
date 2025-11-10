@@ -104,6 +104,17 @@ export class AutoSchema {
       highBloodPressure: 'VARCHAR(255)',
       heartProblems: 'VARCHAR(255)',
       
+      // Metabolic and Other Conditions
+      polycysticOvarianSyndrome: 'VARCHAR(255)',
+      metabolicSyndrome: 'VARCHAR(255)',
+      refluxDisease: 'VARCHAR(255)',
+      degenerativeJointDisease: 'VARCHAR(255)',
+      urinaryStressIncontinence: 'VARCHAR(255)',
+      highCholesterol: 'VARCHAR(255)',
+      venousStasis: 'VARCHAR(255)',
+      irregularMenstrualPeriod: 'VARCHAR(255)',
+      hepatitisType: 'VARCHAR(255)',
+      
       // Respiratory
       respiratoryProblems: 'VARCHAR(255)',
       respiratoryProblemsDetails: 'TEXT',

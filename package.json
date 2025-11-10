@@ -10,6 +10,7 @@
     "create-db": "tsx src/lib/scripts/create-db.ts",
     "check-db": "tsx src/lib/scripts/check-db.ts",
     "init-db": "tsx src/lib/scripts/init-db.ts",
+    "create-medical-records-table": "tsx src/lib/scripts/create-medical-records-table.ts",
     "register-questions": "tsx src/lib/scripts/register-patient-questions.ts",
     "test-mongodb": "tsx src/lib/scripts/test-mongodb.ts",
     "test-claude-4": "tsx src/lib/scripts/test-claude-4.ts",

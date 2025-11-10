@@ -1,4 +1,5 @@
 import { getConnection } from '../config/database';
+import { AutoSchema } from '../utils/autoSchema';
 
 // Interfaces para los tipos de datos
 interface PatientRecord {
@@ -270,8 +271,17 @@ export class AdminModel {
 
   /**
    * Obtener detalles completos de un paciente
+   * Incluye datos del formulario tradicional Y del chatbot
    */
-  static async getPatientDetails(patientId: string): Promise<(PatientRecord & { forms: Record<string, Record<string, unknown>> }) | null> {
+  static async getPatientDetails(patientId: string): Promise<(PatientRecord & { 
+    forms: Record<string, Record<string, unknown>>;
+    chatbotData: {
+      patientInfo?: Record<string, unknown>;
+      surgeryInterest?: Record<string, unknown>;
+      medicalHistory?: Record<string, unknown>;
+      familyHistory?: Record<string, unknown>;
+    };
+  }) | null> {
     const connection = await getConnection();
     
     try {
@@ -296,7 +306,7 @@ export class AdminModel {
       
       const patient = patientInfo[0] as PatientRecord;
       
-      // Obtener datos de todos los formularios
+      // Obtener datos de formularios tradicionales
       const [formData] = await connection.execute(
         `SELECT formType, formData 
          FROM patient_form_data 
@@ -310,10 +320,98 @@ export class AdminModel {
       forms.forEach(form => {
         formDataMap[form.formType] = form.formData;
       });
+
+      // Obtener datos del chatbot desde las tablas estructuradas
+      const chatbotData: {
+        patientInfo?: Record<string, unknown>;
+        surgeryInterest?: Record<string, unknown>;
+        medicalHistory?: Record<string, unknown>;
+        familyHistory?: Record<string, unknown>;
+      } = {};
+
+      // Obtener medicalRecordId
+      const [medicalRecords] = await connection.execute(
+        `SELECT mr.id FROM medical_records mr
+         INNER JOIN patient_records pr ON mr.recordNumber = pr.patientId
+         WHERE pr.patientId = ? LIMIT 1`,
+        [patientId]
+      );
+
+      if (Array.isArray(medicalRecords) && medicalRecords.length > 0) {
+        const medicalRecordId = (medicalRecords[0] as { id: number }).id;
+
+        // Asegurar que las tablas existan antes de intentar leerlas
+        await AutoSchema.ensurePatientInfoColumns();
+        await AutoSchema.ensureSurgeryInterestColumns();
+        await AutoSchema.ensureMedicalHistoryColumns();
+        await AutoSchema.ensureFamilyHistoryColumns();
+
+        // Obtener patient_info
+        try {
+          const [patientInfoData] = await connection.execute(
+            `SELECT * FROM patient_info WHERE medicalRecordId = ? LIMIT 1`,
+            [medicalRecordId]
+          );
+          if (Array.isArray(patientInfoData) && patientInfoData.length > 0) {
+            const data = patientInfoData[0] as Record<string, unknown>;
+            // Remover campos internos
+            const { id, medicalRecordId: _, createdAt: __, updatedAt: ___, ...cleanData } = data;
+            chatbotData.patientInfo = cleanData;
+          }
+        } catch (error) {
+          console.warn('Error al obtener patient_info (tabla puede no existir aún):', error);
+        }
+
+        // Obtener surgery_interest
+        try {
+          const [surgeryInterestData] = await connection.execute(
+            `SELECT * FROM surgery_interest WHERE medicalRecordId = ? LIMIT 1`,
+            [medicalRecordId]
+          );
+          if (Array.isArray(surgeryInterestData) && surgeryInterestData.length > 0) {
+            const data = surgeryInterestData[0] as Record<string, unknown>;
+            const { id, medicalRecordId: _, createdAt: __, updatedAt: ___, ...cleanData } = data;
+            chatbotData.surgeryInterest = cleanData;
+          }
+        } catch (error) {
+          console.warn('Error al obtener surgery_interest (tabla puede no existir aún):', error);
+        }
+
+        // Obtener medical_history
+        try {
+          const [medicalHistoryData] = await connection.execute(
+            `SELECT * FROM medical_history WHERE medicalRecordId = ? LIMIT 1`,
+            [medicalRecordId]
+          );
+          if (Array.isArray(medicalHistoryData) && medicalHistoryData.length > 0) {
+            const data = medicalHistoryData[0] as Record<string, unknown>;
+            const { id, medicalRecordId: _, createdAt: __, updatedAt: ___, ...cleanData } = data;
+            chatbotData.medicalHistory = cleanData;
+          }
+        } catch (error) {
+          console.warn('Error al obtener medical_history (tabla puede no existir aún):', error);
+        }
+
+        // Obtener family_history
+        try {
+          const [familyHistoryData] = await connection.execute(
+            `SELECT * FROM family_history WHERE medicalRecordId = ? LIMIT 1`,
+            [medicalRecordId]
+          );
+          if (Array.isArray(familyHistoryData) && familyHistoryData.length > 0) {
+            const data = familyHistoryData[0] as Record<string, unknown>;
+            const { id, medicalRecordId: _, createdAt: __, updatedAt: ___, ...cleanData } = data;
+            chatbotData.familyHistory = cleanData;
+          }
+        } catch (error) {
+          console.warn('Error al obtener family_history (tabla puede no existir aún):', error);
+        }
+      }
       
       return {
         ...patient,
-        forms: formDataMap
+        forms: formDataMap,
+        chatbotData
       };
     } catch (error) {
       console.error('Error al obtener detalles del paciente:', error);

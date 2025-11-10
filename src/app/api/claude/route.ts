@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ChatSessionService from '../../../lib/services/ChatSessionService';
+import { ChatbotDataSaver } from '../../../lib/services/ChatbotDataSaver';
+import { JWTUtils } from '../../../lib/utils/jwt';
 
 interface ClaudeRequest {
   message: string;
@@ -22,6 +24,26 @@ export async function POST(request: NextRequest) {
   const chatSessionService = new ChatSessionService();
   
   try {
+    // Obtener token de autenticación para guardado incremental
+    const authHeader = request.headers.get('authorization');
+    console.log('🔍 Header authorization recibido:', authHeader ? 'Sí (Bearer ...)' : 'No');
+    const token = authHeader ? JWTUtils.extractTokenFromHeader(authHeader) : null;
+    console.log('🔍 Token extraído:', token ? 'Sí' : 'No');
+    let userId: number | null = null;
+    
+    if (token) {
+      try {
+        const decoded = JWTUtils.verifyToken(token);
+        userId = decoded.userId;
+        console.log('✅ Token verificado, userId:', userId);
+      } catch (error) {
+        // Si el token es inválido, continuamos sin guardado incremental
+        console.warn('⚠️ Token inválido o expirado, guardado incremental deshabilitado:', error instanceof Error ? error.message : 'Error desconocido');
+      }
+    } else {
+      console.warn('⚠️ No se encontró token en la petición. El guardado en MySQL estará deshabilitado.');
+    }
+
     const { message, conversationHistory = [], category, language = 'en', patientId, sessionId }: ClaudeRequest = await request.json();
 
     const API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -33,11 +55,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Función auxiliar para cargar datos desde MySQL a extractedData
+    const loadExtractedDataFromMySQL = async (userId: number | null, patientId: string | undefined): Promise<Record<string, any>> => {
+      if (!userId || !patientId) return {};
+      
+      try {
+        const { AdminModel } = await import('../../../lib/models/Admin');
+        const patientDetails = await AdminModel.getPatientDetails(patientId);
+        
+        if (!patientDetails || !patientDetails.chatbotData) return {};
+        
+        // Convertir datos de las tablas MySQL a formato extractedData
+        const extractedData: Record<string, any> = {};
+        
+        // Combinar todos los datos en un solo objeto
+        if (patientDetails.chatbotData.patientInfo) {
+          Object.assign(extractedData, patientDetails.chatbotData.patientInfo);
+        }
+        if (patientDetails.chatbotData.surgeryInterest) {
+          Object.assign(extractedData, patientDetails.chatbotData.surgeryInterest);
+        }
+        if (patientDetails.chatbotData.medicalHistory) {
+          Object.assign(extractedData, patientDetails.chatbotData.medicalHistory);
+        }
+        if (patientDetails.chatbotData.familyHistory) {
+          Object.assign(extractedData, patientDetails.chatbotData.familyHistory);
+        }
+        
+        return extractedData;
+      } catch (error) {
+        console.warn('Error al cargar datos desde MySQL:', error);
+        return {};
+      }
+    };
+
     // Manejar sesión de chat
     let currentSession;
     if (message === 'start') {
       // Crear nueva sesión (usa 'guest' si no hay patientId) y responder sin invocar a Claude
       currentSession = await chatSessionService.createSession(patientId || 'guest');
+      
+      // Cargar datos existentes desde MySQL si hay userId y patientId
+      if (userId && patientId) {
+        const existingData = await loadExtractedDataFromMySQL(userId, patientId);
+        if (Object.keys(existingData).length > 0) {
+          await chatSessionService.updateExtractedData(currentSession.id, existingData);
+          currentSession.extractedData = existingData;
+        }
+      }
+      
       return NextResponse.json({
         success: true,
         session: currentSession
@@ -51,9 +117,27 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
+      
+      // Si la sesión no tiene extractedData o está vacío, cargar desde MySQL
+      if ((!currentSession.extractedData || Object.keys(currentSession.extractedData).length === 0) && userId && currentSession.patientId && currentSession.patientId !== 'guest') {
+        const existingData = await loadExtractedDataFromMySQL(userId, currentSession.patientId);
+        if (Object.keys(existingData).length > 0) {
+          await chatSessionService.updateExtractedData(currentSession.id, existingData);
+          currentSession.extractedData = existingData;
+        }
+      }
     } else if (patientId) {
       // Si hay patientId pero no sessionId, crear una nueva sesión
       currentSession = await chatSessionService.createSession(patientId);
+      
+      // Cargar datos existentes desde MySQL
+      if (userId) {
+        const existingData = await loadExtractedDataFromMySQL(userId, patientId);
+        if (Object.keys(existingData).length > 0) {
+          await chatSessionService.updateExtractedData(currentSession.id, existingData);
+          currentSession.extractedData = existingData;
+        }
+      }
     } else {
       // Sin sessionId ni patientId: crear sesión guest
       currentSession = await chatSessionService.createSession('guest');
@@ -62,6 +146,48 @@ export async function POST(request: NextRequest) {
     // Construir el prompt base
     const currentCategory = currentSession.currentCategory || category || 'personal';
     const basePrompt = buildBasePrompt(currentCategory, language);
+    
+    // SIEMPRE consultar MySQL para obtener la información más actualizada
+    // Esta es la fuente de verdad, ya que de aquí se genera el PDF
+    let extractedData: Record<string, any> = {};
+    if (userId && currentSession.patientId && currentSession.patientId !== 'guest') {
+      console.log('📊 Consultando MySQL para obtener datos recopilados del paciente...');
+      const mysqlData = await loadExtractedDataFromMySQL(userId, currentSession.patientId);
+      if (Object.keys(mysqlData).length > 0) {
+        extractedData = mysqlData;
+        console.log(`✅ Datos cargados desde MySQL: ${Object.keys(extractedData).length} campos`);
+        // Actualizar también en MongoDB para mantener sincronización
+        await chatSessionService.updateExtractedData(currentSession.id, extractedData);
+      } else {
+        // Si no hay datos en MySQL, intentar obtener de la sesión MongoDB como fallback
+        const updatedSession = await chatSessionService.getSession(currentSession.id);
+        extractedData = updatedSession?.extractedData || currentSession.extractedData || {};
+        console.log(`⚠️ No hay datos en MySQL, usando datos de sesión: ${Object.keys(extractedData).length} campos`);
+      }
+    } else {
+      // Si no hay userId o patientId, usar datos de la sesión MongoDB
+      const updatedSession = await chatSessionService.getSession(currentSession.id);
+      extractedData = updatedSession?.extractedData || currentSession.extractedData || {};
+      console.log(`ℹ️ Sesión guest o sin userId, usando datos de sesión: ${Object.keys(extractedData).length} campos`);
+    }
+    
+    // Construir lista de campos ya recopilados de forma más legible
+    const collectedFields: string[] = [];
+    if (extractedData.firstName || extractedData.lastName) collectedFields.push('Información personal básica (nombre, apellido)');
+    if (extractedData.dateOfBirth || extractedData.age) collectedFields.push('Fecha de nacimiento/edad');
+    if (extractedData.gender) collectedFields.push('Género');
+    if (extractedData.email || extractedData.phoneNumber) collectedFields.push('Contacto (email, teléfono)');
+    if (extractedData.surgeryInterest) collectedFields.push('Interés quirúrgico');
+    if (extractedData.diabetes || extractedData.highBloodPressure || extractedData.sleepApnea) collectedFields.push('Condiciones médicas');
+    if (extractedData.medications) collectedFields.push('Medicamentos');
+    if (extractedData.allergies) collectedFields.push('Alergias');
+    if (extractedData.previousSurgeries) collectedFields.push('Cirugías previas');
+    if (extractedData.tobacco || extractedData.alcohol || extractedData.drugs) collectedFields.push('Historial social');
+    if (extractedData.heartDisease || extractedData.diabetesMellitus) collectedFields.push('Historial familiar');
+    
+    const extractedDataText = Object.keys(extractedData).length > 0
+      ? `\n\n⚠️ INFORMACIÓN YA RECOPILADA - NO PREGUNTES ESTO DE NUEVO ⚠️\n\nEl paciente ya ha proporcionado la siguiente información:\n${collectedFields.length > 0 ? '- ' + collectedFields.join('\n- ') : 'Ninguna información recopilada aún'}\n\nDatos completos ya recopilados:\n${JSON.stringify(extractedData, null, 2)}\n\nREGLAS CRÍTICAS:\n- NUNCA vuelvas a preguntar sobre información que ya está en la lista anterior\n- NUNCA repitas preguntas que ya has hecho en esta conversación\n- Si un campo ya tiene valor en los datos recopilados, NO lo preguntes de nuevo\n- Revisa los datos recopilados ANTES de hacer cualquier pregunta\n- Solo pregunta sobre información que NO esté en los datos recopilados\n- Continúa sistemáticamente con las siguientes secciones que aún faltan\n\nIMPORTANTE: Si ves que un dato ya está recopilado, simplemente continúa con la siguiente pregunta/sección. NO lo menciones ni lo preguntes de nuevo.`
+      : '';
     
     // Construir el historial de conversación desde la sesión
     const sessionMessages = currentSession.messages.map(msg => ({
@@ -72,7 +198,7 @@ export async function POST(request: NextRequest) {
     const messages: Array<{role: 'user' | 'assistant', content: string}> = [
       {
         role: 'user' as const,
-        content: `${basePrompt}\n\nUser message: ${message}`
+        content: `${basePrompt}${extractedDataText}\n\nUser message: ${message}`
       }
     ];
 
@@ -120,6 +246,103 @@ export async function POST(request: NextRequest) {
         await chatSessionService.addMessage(currentSession.id, userMessage);
         await chatSessionService.addMessage(currentSession.id, assistantMessage);
         
+        // Extraer y guardar datos incrementalmente
+        let extractedData = {};
+        try {
+          extractedData = await extractStructuredData(
+            currentSession.id,
+            chatSessionService,
+            language
+          );
+          
+          // Log de datos extraídos
+          if (Object.keys(extractedData).length > 0) {
+            console.log('📥 Datos extraídos de la conversación:', Object.keys(extractedData).length, 'campos');
+            console.log('   Campos extraídos:', Object.keys(extractedData).slice(0, 30).join(', '));
+            // Mostrar algunos valores de ejemplo para verificar
+            const sampleFields = Object.entries(extractedData).slice(0, 5);
+            sampleFields.forEach(([key, value]) => {
+              const valueStr = typeof value === 'string' ? value.substring(0, 50) : String(value).substring(0, 50);
+              console.log(`   - ${key}: ${valueStr}${valueStr.length >= 50 ? '...' : ''}`);
+            });
+          } else {
+            console.log('⚠️ No se extrajeron datos de la conversación');
+          }
+          
+          // Actualizar extractedData en la sesión y guardar en MySQL
+          if (Object.keys(extractedData).length > 0) {
+            // IMPORTANTE: Usar MySQL como fuente de verdad para el merge
+            // Cargar datos actuales de MySQL antes de hacer merge
+            let mysqlCurrentData: Record<string, any> = {};
+            if (userId && currentSession.patientId && currentSession.patientId !== 'guest') {
+              try {
+                mysqlCurrentData = await loadExtractedDataFromMySQL(userId, currentSession.patientId);
+                console.log(`📊 Datos actuales en MySQL: ${Object.keys(mysqlCurrentData).length} campos`);
+              } catch (mysqlError) {
+                console.warn('⚠️ Error al cargar datos de MySQL para merge:', mysqlError);
+                // Si falla, usar datos de MongoDB como fallback
+                const updatedSession = await chatSessionService.getSession(currentSession.id);
+                mysqlCurrentData = updatedSession?.extractedData || currentSession.extractedData || {};
+              }
+            } else {
+              // Si no hay userId, usar datos de MongoDB
+              const updatedSession = await chatSessionService.getSession(currentSession.id);
+              mysqlCurrentData = updatedSession?.extractedData || currentSession.extractedData || {};
+            }
+            
+            // Hacer merge: MySQL (base) + datos extraídos (tienen prioridad)
+            // Los datos extraídos sobrescriben los de MySQL si hay conflictos
+            const mergedData = { ...mysqlCurrentData, ...extractedData };
+            
+            // Actualizar también en MongoDB para mantener sincronización
+            await chatSessionService.updateExtractedData(currentSession.id, mergedData);
+            
+            console.log('📦 Datos combinados (merged):', Object.keys(mergedData).length, 'campos totales');
+            console.log(`   - De MySQL: ${Object.keys(mysqlCurrentData).length} campos`);
+            console.log(`   - Extraídos ahora: ${Object.keys(extractedData).length} campos`);
+            
+            // Guardar en MySQL si tenemos userId
+            if (userId) {
+              try {
+                console.log('💾 Guardando datos en MySQL...');
+                const saveResult = await ChatbotDataSaver.saveChatbotData(userId, mergedData);
+                
+                if (saveResult.success) {
+                  console.log('✅ Datos guardados exitosamente en MySQL');
+                  console.log('   Tablas guardadas:', saveResult.savedTables?.join(', ') || 'ninguna');
+                  if (saveResult.savedTables && saveResult.savedTables.length > 0) {
+                    saveResult.savedTables.forEach(table => {
+                      console.log(`   ✓ ${table} guardado correctamente`);
+                    });
+                  } else {
+                    console.warn('   ⚠️ No se guardaron datos en ninguna tabla (posiblemente no hay datos nuevos)');
+                  }
+                } else {
+                  console.error('❌ Error al guardar en MySQL:', saveResult.message);
+                }
+              } catch (saveError) {
+                // No fallar la respuesta si el guardado falla, solo loguear
+                console.error('❌ Error al guardar datos en MySQL:', saveError);
+                if (saveError instanceof Error) {
+                  console.error('   Mensaje:', saveError.message);
+                  console.error('   Stack:', saveError.stack);
+                }
+              }
+            } else {
+              console.warn('⚠️ No hay userId, datos no se guardarán en MySQL (solo en MongoDB)');
+            }
+          } else {
+            console.log('ℹ️ No hay datos nuevos para guardar');
+          }
+        } catch (extractError) {
+          // No fallar la respuesta si la extracción falla, solo loguear
+          console.error('❌ Error al extraer datos estructurados:', extractError);
+          if (extractError instanceof Error) {
+            console.error('   Mensaje:', extractError.message);
+            console.error('   Stack:', extractError.stack);
+          }
+        }
+        
         // Actualizar sesión con mensajes
         const updatedSession = await chatSessionService.getSession(currentSession.id);
         
@@ -149,51 +372,76 @@ function buildBasePrompt(category: string = 'general', language: 'es' | 'en' = '
   const baseInstructions = {
     es: `Eres un asistente médico especializado en recopilar información de pacientes para cuestionarios médicos.
 
-INSTRUCCIONES:
-- Eres un médico amigable y profesional
-- Haz preguntas de manera conversacional y natural
-- Si el usuario da respuestas incompletas, haz preguntas de seguimiento
-- Mantén un tono empático y comprensivo
+REGLAS CRÍTICAS - SEGUIR ESTRICTAMENTE:
+- NUNCA hagas preguntas abiertas como "¿Te gustaría hablar de algo más?", "¿Hay algo más?", "¿Tienes alguna pregunta para mí?", "¿Sobre qué te gustaría hablar?", "¿Cuál es la razón de tu visita?", "¿Qué síntomas tienes?", "¿Qué te trae por aquí?" DURANTE el cuestionario. Estas preguntas están COMPLETAMENTE PROHIBIDAS.
+- NUNCA preguntes sobre síntomas, razones de visita, o preocupaciones médicas de forma abierta. Este NO es un cuestionario de síntomas, es un cuestionario médico estructurado con secciones específicas.
+- NUNCA reinicies la conversación desde el principio. NUNCA digas "Empecemos de nuevo" o vuelvas a preguntar información básica (nombre, fecha de nacimiento) si ya has recibido respuestas.
+- NUNCA repitas preguntas que ya has hecho. Siempre avanza sistemáticamente a través de las secciones del cuestionario.
+- Cuando una sección esté completa (todas las preguntas respondidas O el paciente dice "no" a una condición), INMEDIATAMENTE pasa a la siguiente sección sin hacer preguntas abiertas.
+- Tu ÚNICO objetivo es recopilar TODAS las respuestas del cuestionario sistemáticamente siguiendo el orden: Información Personal → Interés Quirúrgico → Historial de Peso → Historial Médico → Historial Familiar → Contacto de Emergencia (al final). No te desvíes de esto.
+- Si un paciente dice "No" a tener una condición/enfermedad, reconoce brevemente y pasa inmediatamente a la siguiente pregunta o sección.
+- Es completamente normal y válido que los pacientes respondan "No" a muchas condiciones médicas. Muchos pacientes están sanos. Continúa sistemáticamente a través de todas las secciones del cuestionario sin importar cuántas respuestas "No" recibas.
+- Siempre continúa con la SIGUIENTE sección del cuestionario. No reinicies, no repitas, no regreses a secciones anteriores.
+- DESPUÉS de recopilar información personal (nombre, fecha de nacimiento, género, dirección), INMEDIATAMENTE pasa a preguntar sobre el INTERÉS QUIRÚRGICO. NO preguntes sobre síntomas, razones de visita, o preocupaciones.
+
+INSTRUCCIONES - TONO CONVERSACIONAL:
+- Eres un médico amigable, profesional y empático. Esta es una CONVERSACIÓN, NO un formulario robotizado
+- Habla como lo haría un médico real en una consulta: de forma natural, cálida y conversacional
+- NUNCA hagas preguntas como si fueras un formulario. En lugar de "¿Tienes diabetes? Sí/No", pregunta "¿Has tenido algún diagnóstico de diabetes?"
+- Varía constantemente tu forma de preguntar. No uses siempre la misma estructura
+- Usa reconocimientos naturales: "Entiendo", "Perfecto", "Gracias por compartir eso", "Eso es útil saberlo"
+- Haz preguntas de manera conversacional y natural, como si estuvieras charlando con el paciente
+- Si el usuario da respuestas incompletas, haz preguntas de seguimiento de forma amigable
+- Mantén un tono empático y comprensivo en todo momento
 - Responde SOLO en español
 - Mantén las respuestas concisas (máximo 200 palabras)
 - SIEMPRE extrae y guarda la información que te proporciona el paciente
-- Evita sonar robótico: varía la redacción, usa conectores naturales y micro‑reconocimientos breves ("gracias", "entendido", "perfecto")
-- En cada turno: 1) reconoce brevemente lo dicho y 2) formula 1–2 preguntas relacionadas en una sola frase
-- No enumeres opciones en listas a menos que el usuario lo pida; usa ejemplos cortos solo si ayudan
+- Evita sonar robótico: varía la redacción, usa conectores naturales y micro‑reconocimientos breves
+- En cada turno: 1) reconoce brevemente lo dicho de forma natural y 2) formula 1–2 preguntas relacionadas de manera conversacional
+- NO enumeres opciones en listas a menos que el usuario lo pida; integra las preguntas en la conversación de forma natural
 - Adapta el vocabulario al del usuario y evita repetir la misma frase de apertura
-- No repitas preguntas ya respondidas; si falta un dato, pregunta solo ese detalle
-- Usa transiciones suaves entre temas con una oración de puente`,
+- NUNCA repitas preguntas ya respondidas. NUNCA preguntes dos veces lo mismo. Si falta un dato, pregunta solo ese detalle de forma natural, pero SOLO si no está en "INFORMACIÓN YA RECOPILADA"
+- Usa transiciones suaves entre temas con una oración de puente conversacional
+- Cuando transiciones a una nueva sección, usa un puente breve como "Ahora pasemos a [siguiente tema]..." o "Gracias, ahora me gustaría preguntarte sobre [siguiente tema]..." y continúa con la siguiente pregunta
+- Siempre avanza sistemáticamente. Si ya has recopilado información, continúa con la siguiente sección, nunca regreses a secciones anteriores
+- Recuerda: Esta es una conversación amena donde obtienes información completa, NO un cuestionario robotizado`,
     
     en: `You are a medical assistant specialized in collecting patient information for medical questionnaires.
 
 CRITICAL RULES - FOLLOW STRICTLY:
 - NEVER ask open-ended questions like "Would you like to discuss anything?", "Is there anything else?", "Any questions for me?", "What would you like to talk about?" DURING the questionnaire. These questions are ONLY allowed at the very end AFTER all questionnaire sections are complete.
 - NEVER restart the conversation from the beginning. NEVER say "Let me start over" or ask for basic information (name, date of birth) again if you have already received responses.
-- NEVER repeat questions you have already asked. Always move forward systematically through the questionnaire sections.
+- NEVER repeat questions you have already asked. NEVER ask the same question twice. NEVER duplicate questions.
+- BEFORE asking any question, CHECK the "ALREADY COLLECTED INFORMATION" section to verify you are not asking something you already know.
+- If a piece of data is already in "ALREADY COLLECTED INFORMATION", DO NOT ask about it. Simply continue with the next question/section.
 - When a section is complete (all questions answered OR patient says "no" to a condition), IMMEDIATELY move to the next section without asking open-ended questions.
 - Your ONLY goal is to collect ALL questionnaire answers systematically. Do not deviate from this.
 - If a patient says "No" to having a condition/disease, acknowledge briefly and move to the next question or section immediately.
 - It is completely normal and valid for patients to answer "No" to many medical conditions. Many patients are healthy. Continue systematically through all questionnaire sections regardless of how many "No" answers you receive.
 - Always continue with the NEXT section of the questionnaire. Do not restart, do not repeat, do not go back to previous sections.
+- If you are not sure if you already asked something, CHECK the conversation history and collected data BEFORE asking.
 
-INSTRUCTIONS:
-- You are a friendly and professional doctor
-- Ask questions in a conversational and natural way
-- If the user gives incomplete answers, ask follow-up questions
-- Maintain an empathetic and understanding tone
+INSTRUCTIONS - CONVERSATIONAL TONE:
+- You are a friendly, professional, and empathetic doctor. This is a CONVERSATION, NOT a robotic form
+- Speak as a real doctor would in a consultation: naturally, warmly, and conversationally
+- NEVER ask questions like a form. Instead of "Do you have diabetes? Yes/No", ask "Have you ever been diagnosed with diabetes?"
+- Constantly vary your way of asking. Don't always use the same structure
+- Use natural acknowledgments: "I understand", "Perfect", "Thanks for sharing that", "That's useful to know"
+- Ask questions in a conversational and natural way, as if you're chatting with the patient
+- If the user gives incomplete answers, ask follow-up questions in a friendly way
+- Maintain an empathetic and understanding tone at all times
 - Respond ONLY in English
 - Keep responses concise (maximum 200 words)
 - ALWAYS extract and save the information the patient provides
-- Avoid robotic tone: vary phrasing, use natural connectors and brief micro‑acknowledgments ("thanks", "got it", "great")
-- Each turn: 1) briefly acknowledge, 2) ask 1–2 related questions in a single sentence. When useful, COMBINE 2–3 tightly related fields into ONE natural question (e.g., first name + last name + date of birth).
-- Do not list options unless requested; use short inline examples only when helpful
+- Avoid robotic tone: vary phrasing, use natural connectors and brief micro‑acknowledgments
+- Each turn: 1) briefly acknowledge what was said naturally and 2) ask 1–2 related questions conversationally
+- Do NOT list options unless requested; integrate questions into the conversation naturally
 - Mirror the user's wording and avoid repeating the same opening phrase
-- Do not re‑ask answered questions; if a detail is missing, ask only that
-- NEVER restart from the beginning - always continue forward through the questionnaire sections
-- NEVER repeat basic information questions (name, date of birth) once they have been answered
-- Use smooth transitions between topics with a short bridging sentence
+- NEVER re-ask answered questions. NEVER ask the same thing twice. If a detail is missing, ask only that naturally, but ONLY if it's not in "ALREADY COLLECTED INFORMATION"
+- Use smooth transitions between topics with a conversational bridging sentence
 - When transitioning to a new section, use a brief bridge like "Now let's move on to [next topic]..." or "Thanks, now I'd like to ask about [next topic]..." and continue with the next question
-- Always move forward systematically. If you've already collected information, continue with the next section, never go back to previous sections`
+- Always move forward systematically. If you've already collected information, continue with the next section, never go back to previous sections
+- Remember: This is a pleasant conversation where you get complete information, NOT a robotic questionnaire`
   };
 
   const categoryContext = {
@@ -211,18 +459,26 @@ INSTRUCTIONS:
       - Estado/Provincia
       - Código postal
       
-      Haz las preguntas de forma conversacional, una por una, y confirma cada respuesta antes de continuar.`,
-      survey: `Estás recopilando información sobre cómo el paciente se enteró de nosotros. Preguntas disponibles:
-      - Cómo se enteró de nosotros (Instagram, Facebook, Google, Referido, Otro)
-      - Si eligió "Otro", especificar cómo
+      Haz las preguntas de forma conversacional, una por una, y confirma cada respuesta antes de continuar.
       
-      Haz las preguntas de forma conversacional y natural.`,
+      IMPORTANTE: Una vez que tengas esta información, INMEDIATAMENTE pasa a preguntar sobre el INTERÉS QUIRÚRGICO (surgeryInterest). NO hagas preguntas abiertas sobre síntomas, razones de visita, o preocupaciones. Este NO es un cuestionario de síntomas.`,
+      survey: `Estás recopilando información sobre cómo el paciente se enteró de nosotros. Preguntas disponibles:
+      - Cómo se enteró de nosotros (puede seleccionar múltiples): Instagram, YouTube, Google Search, Recommended by a friend or patient, Doctor referral, WhatsApp, Other
+      - Si eligió "Other", especificar cómo
+      - ¿Quién te refirió a nosotros? (campo de texto separado)
+      
+      Haz las preguntas de forma conversacional y natural. Permite selección múltiple si menciona varias opciones.`,
       contact: `Estás recopilando información de contacto del paciente. Preguntas disponibles:
       - Número de teléfono
       - Correo electrónico  
       - Método de contacto preferido (Texto, Llamada, Email)
       
       AGRUPA estas preguntas en una sola interacción para que sea más natural. Por ejemplo: "¿Me podrías dar tu número de teléfono y correo electrónico?"`,
+      insurance: `Estás recopilando información de seguros del paciente. Preguntas disponibles:
+      - ¿Tiene seguro médico? (Sí/No)
+      - Si "Sí": Proveedor de seguro, Número de póliza, Número de grupo
+      
+      Si dice "No", reconoce brevemente y pasa a la siguiente sección. Si dice "Sí", pregunta los detalles.`,
       work: `Estás recopilando información laboral y educativa del paciente. Preguntas disponibles:
       - Ocupación actual
       - Empleador
@@ -237,7 +493,7 @@ INSTRUCTIONS:
       - IMC (calculado automáticamente)
       
       AGRUPA estas preguntas de forma natural. Por ejemplo: "Para calcular tu IMC, ¿me podrías decir tu altura en pies y pulgadas y tu peso en libras?"`,
-      emergency: `Estás recopilando información del contacto de emergencia del paciente. Preguntas disponibles:
+      emergency: `IMPORTANTE: Esta sección se pregunta AL FINAL, DESPUÉS de determinar el procedimiento quirúrgico del paciente. Estás recopilando información del contacto de emergencia del paciente. Preguntas disponibles:
       - Nombre del contacto de emergencia
       - Apellido del contacto de emergencia
       - Relación con el paciente
@@ -251,46 +507,74 @@ INSTRUCTIONS:
       - Tipo de cirugía o consulta (si aplica)
       
       Haz las preguntas de forma conversacional y maneja las respuestas condicionales de forma natural.`,
-      familyHistory: `Estás recopilando el historial familiar del paciente. Preguntas disponibles:
-      - Enfermedades cardíacas, diabetes, alcoholismo, problemas pulmonares
-      - Cálculos biliares, hipertermia maligna, edema pulmonar
-      - Presión arterial alta, problemas hepáticos, trastornos hemorrágicos
-      - Enfermedades mentales, cáncer
+      familyHistory: `Estás recopilando el historial familiar del paciente. IMPORTANTE: Pregunta de forma CONVERSACIONAL, NO como un formulario. Debes preguntar condición por condición (Sí/No para cada una):
+      - Heart disease (Enfermedad cardíaca)
+      - Alcoholism (Alcoholismo)
+      - Gallstones (Cálculos biliares)
+      - Pulmonary edema (Edema pulmonar)
+      - Liver problems (Problemas hepáticos)
+      - Mental Illness (Enfermedad mental)
+      - Diabetes Mellitus (Diabetes Mellitus)
+      - Lung problems (Problemas pulmonares)
+      - Malignant hyperthermia (Hipertermia maligna)
+      - High blood pressure (Presión arterial alta)
+      - Bleeding disorder (Trastorno hemorrágico)
+      - Cancer (Cáncer)
       
-      AGRUPA estas preguntas en una sola interacción para que sea más natural. Si el paciente dice "No" a todas, reconoce brevemente y pasa INMEDIATAMENTE a la siguiente sección. NO hagas preguntas abiertas como "¿hay algo más?".`,
-      medicalHistory: `Estás recopilando el historial médico personal del paciente. Preguntas disponibles:
-      - Apnea del sueño (Sí/No)
-      - Diabetes (Sí/No)
-      - Uso de insulina (si tiene diabetes)
-      - Uso de CPAP (si tiene apnea del sueño)
-      - Uso de BiPAP (si usa CPAP)
+      Pregunta de forma natural y conversacional, agrupando 2-3 condiciones relacionadas. Varía tu forma de preguntar, por ejemplo: "¿Hay algún historial de enfermedad cardíaca o diabetes en tu familia?" en lugar de listar opciones. Si el paciente dice "No" a todas, reconoce brevemente y pasa INMEDIATAMENTE a la siguiente sección de forma natural. NO hagas preguntas abiertas como "¿hay algo más?".`,
+      medicalHistory: `Estás recopilando el historial médico personal del paciente. IMPORTANTE: Pregunta de forma CONVERSACIONAL, NO como un formulario. Pregunta condición por condición (puede tener múltiples):
+      - Diabetes Mellitus (Sí/No) → Si "Sí": ¿Usa insulina? (Sí/No)
+      - High Blood Pressure (Presión arterial alta) (Sí/No)
+      - Sleep Apnea (Apnea del sueño) (Sí/No) → Si "Sí": ¿Usa CPAP o BiPAP? (Sí/No) → Si "Sí": ¿Cuántas horas por noche?
+      - Polycystic Ovarian Syndrome (Síndrome de Ovario Poliquístico) (Sí/No)
+      - Metabolic Syndrome (Síndrome metabólico) (Sí/No)
+      - Reflux Disease (Enfermedad por reflujo) (Sí/No)
+      - Degenerative Joint Disease (Enfermedad degenerativa articular) (Sí/No)
+      - Urinary Stress Incontinence (Incontinencia urinaria de esfuerzo) (Sí/No)
+      - High Cholesterol (Colesterol alto) (Sí/No)
+      - Venous Stasis (Leg Swelling) (Estasis venosa - hinchazón de piernas) (Sí/No)
+      - Irregular Menstrual Period (Período menstrual irregular) (Sí/No)
       
-      AGRUPA estas preguntas de forma natural. Por ejemplo: "¿Has sido diagnosticado con apnea del sueño o diabetes?"`,
-      additionalMedical: `Estás recopilando otras condiciones médicas del paciente. Preguntas disponibles:
-      - Otras condiciones médicas o hospitalizaciones (no quirúrgicas)
+      Pregunta de forma natural y conversacional, agrupando 2-3 condiciones relacionadas. Varía tu forma de preguntar, por ejemplo: "¿Has tenido algún diagnóstico de diabetes o presión arterial alta?" en lugar de listar opciones. Si dice "No" a una condición, pasa inmediatamente a la siguiente de forma natural.`,
+      additionalMedical: `Estás recopilando otras condiciones médicas o hospitalizaciones no quirúrgicas del paciente. 
+      Para cada condición, necesitas: Condition or Illness Treated / Treating Doctor / Hospital or Clinic / Year of Diagnosis or Treatment Start / Duration of Treatment
       
-      Haz esta pregunta de forma abierta y natural.`,
+      Indaga con preguntas independientes: "¿Has tenido otras condiciones médicas o hospitalizaciones no quirúrgicas?" Si dice "Sí", pregunta una por una: "¿Qué condición?", "¿Quién fue tu médico tratante?", "¿En qué hospital o clínica?", "¿En qué año?", "¿Cuánto tiempo duró el tratamiento?". Continúa hasta que diga que no hay más.`,
       surgicalInterest: `Estás recopilando el interés quirúrgico del paciente. Preguntas disponibles:
-      - Tipo de cirugía de interés (bariátrica por primera vez, bariátrica de revisión, plástica primaria, plástica post-bariátrica)
-      - Nombre específico de la cirugía (según el tipo seleccionado)
+      - Tipo de cirugía de interés: First-time Bariatric Surgery, Revisional Bariatric Surgery, Primary Plastic Surgery, Post Bariatric Plastic Surgery, Metabolic Rehab
+      - Según el tipo seleccionado:
+        * First-time Bariatric: Select procedure (Gastric Sleeve, Gastric Bypass, SADI-S/SASI-S)
+        * Revisional Bariatric: Select procedure (Band to Sleeve, Band to Bypass, Sleeve to Bypass, Bypass Revision)
+        * Primary Plastic: Select procedures (múltiple: Lipo BBL, Abdominoplasty, Breast Augmentation, Brachioplasty, Torsoplasty, etc.)
+        * Post Bariatric Plastic: Select procedures (múltiple, similar a Primary Plastic)
+        * Metabolic Rehab: No procedure selection needed
+      - How far are you in the process? (Just researching, Consultation scheduled, Pre-op appointments, Ready to schedule, Surgery scheduled)
+      - Surgeon Preference (No preference, Specific surgeon, Specific clinic, Other)
+      - Additional Procedures of Interest (solo para Revisional Bariatric y Post Bariatric Plastic)
+      - Estimated date of surgery
       
-      Haz las preguntas de forma conversacional, guiando al usuario a través de las opciones y pidiendo detalles específicos cuando sea necesario.`,
-      weightHistory: `Estás recopilando el historial de peso del paciente. Preguntas disponibles:
-      - Peso más alto y fecha
-      - Peso de cirugía (si aplica)
-      - Peso más bajo y fecha
-      - Peso actual y tiempo mantenido
-      - Peso objetivo y fecha objetivo
-      - Peso recuperado, fecha y tiempo (si aplica)
+      Haz las preguntas de forma conversacional, guiando al usuario a través de las opciones.`,
+      weightHistory: `Estás recopilando el historial de peso del paciente. IMPORTANTE: El contenido cambia según el tipo de cirugía:
+      
+      Para First-time Bariatric Surgery:
+      - Highest Weight (HW) y fecha
+      - Lowest Weight (LW) y fecha
+      - Current Weight (CW) y "How long have you maintained your CW?"
+      - Goal Weight (GW)
+      
+      Para Revisional Bariatric Surgery o Post Bariatric Plastic Surgery:
+      - Highest Weight (HW) y fecha
+      - Surgery Weight (SW) - peso al momento de la cirugía previa
+      - Lowest Weight (LW) y fecha
+      - Current Weight (CW) y "How long have you maintained your CW?"
+      - Goal Weight (GW) y "When do you aim to reach your GW?"
+      - Weight Regained (WR): cantidad, fecha (año), y "In how much time?"
+      
+      Para Primary Plastic Surgery o Metabolic Rehab:
+      - NO preguntar historial de peso (esta sección no aplica)
       
       AGRUPA estas preguntas de forma natural. Por ejemplo: "¿Cuál ha sido tu peso más alto y cuándo fue?"`,
-      surgeryDetails: `Estás recopilando los detalles de la cirugía del paciente. Preguntas disponibles:
-      - Etapa del proceso de cirugía (justo comenzando, consulta programada, citas pre-op, listo para programar, cirugía programada)
-      - Preferencia de cirujano (sin preferencia, cirujano específico, clínica específica, otra)
-      - Procedimientos adicionales de interés
-      - Fecha estimada de cirugía
-      
-      Haz las preguntas de forma conversacional, explicando las opciones disponibles.`,
+      surgeryDetails: `Estás recopilando los detalles de la cirugía del paciente. Esta información ya está incluida en surgicalInterest. No preguntes esto por separado.`,
       gerdInformation: `Estás recopilando información sobre la enfermedad por reflujo gastroesofágico (GERD) del paciente. Preguntas disponibles:
       - Frecuencia de acidez estomacal (por semana)
       - Frecuencia de regurgitación (por semana)
@@ -301,43 +585,58 @@ INSTRUCTIONS:
       - Si se ha realizado endoscopia GI superior, manometría esofágica o monitorización de pH de 24 horas, y sus fechas y hallazgos
       
       AGRUPA las preguntas de frecuencia de síntomas de GERD en una sola interacción. Luego, pregunta sobre las pruebas diagnósticas de GERD, agrupando las preguntas de 'cuándo' y 'hallazgos' si la respuesta es 'sí'.`,
-      currentMedicalConditions: `Estás recopilando las condiciones médicas actuales del paciente. Preguntas disponibles:
-      - Presión arterial alta (Sí/No)
-      - Apnea del sueño (Sí/No)
-      - Condiciones urinarias (Sí/No + detalles si aplica)
-      - Condiciones musculares (Sí/No + detalles si aplica)
-      - Condiciones neurológicas (Sí/No + detalles si aplica)
-      - Trastornos sanguíneos (Sí/No + detalles si aplica)
-      - Condiciones endocrinas (Sí/No + detalles si aplica)
+      currentMedicalConditions: `Estás recopilando las condiciones médicas actuales del paciente por sistema. IMPORTANTE: Pregunta de forma CONVERSACIONAL, NO como un formulario. Debes preguntar condición por condición (puede tener múltiples). Pregunta de forma natural y conversacional, agrupando 2-4 condiciones relacionadas por sistema. Si dice "No" a todas las condiciones de un sistema, pasa inmediatamente al siguiente sistema de forma natural.
       
-      AGRUPA las preguntas principales en una sola interacción. Si el paciente dice "No" a una condición, reconoce brevemente y pasa INMEDIATAMENTE a la siguiente pregunta o sección. SOLO pregunta detalles si la respuesta es 'Sí'. NO hagas preguntas abiertas como "¿hay algo más?".`,
-      psychiatricConditions: `Estás recopilando información sobre las condiciones psiquiátricas del paciente. Preguntas disponibles:
-      - ¿Ha estado alguna vez en un hospital psiquiátrico? (Sí/No)
-      - ¿Ha intentado suicidarse alguna vez? (Sí/No)
-      - ¿Ha sido abusado físicamente alguna vez? (Sí/No)
-      - ¿Ha visto alguna vez a un psiquiatra o consejero? (Sí/No)
-      - ¿Ha tomado alguna vez medicamentos para problemas psiquiátricos o para la depresión? (Sí/No)
-      - ¿Ha estado alguna vez en un programa de dependencia química? (Sí/No)
+      HEART PROBLEMS: Heart attack, Angina, Rhythm Disturbance/Palpitations, Congestive Heart Failure, High Blood Pressure, Ankle Swelling, Varicose Veins, Hemorrhoids, Phlebitis, Ankle/Leg Ulcers, Heart Bypass/Valve Replacement, Pacemaker, Clogged Heart Arteries, Rheumatic Fever/Valve Damage, Heart Murmur, Irregular Heart Beat, Cramping in legs when walking, Other symptoms, None
       
-      AGRUPA estas preguntas de forma natural en una o dos interacciones. Si el paciente dice "No" a todas o algunas, reconoce brevemente y pasa INMEDIATAMENTE a la siguiente sección. NO hagas preguntas abiertas como "¿hay algo más?".`,
-      gastrointestinalConditions: `Estás recopilando información sobre las condiciones gastrointestinales del paciente. Preguntas disponibles:
-      - ¿Tiene alguna condición gastrointestinal? (Sí/No + detalles si aplica)
+      RESPIRATORY PROBLEMS: Respiratory, Asthma, Emphysema, Bronchitis, Pneumonia, Chronic Cough, Short of Breath, Use of CPAP or oxygen supplement, Tuberculosis, Pulmonary Embolism, Hypoventilation Syndrome, Cough up Blood, Snoring, Sleep Apnea, Lung Surgery, Lung Cancer, None
       
-      Si la respuesta es 'Sí', pide detalles específicos. Si la respuesta es 'No', reconoce brevemente y pasa INMEDIATAMENTE a la siguiente sección. NO hagas preguntas abiertas.`,
-      headAndNeckConditions: `Estás recopilando información sobre las condiciones de cabeza y cuello del paciente. Preguntas disponibles:
-      - ¿Tiene alguna condición de cabeza y cuello? (Sí/No + detalles si aplica)
+      URINARY CONDITIONS: Kidney stones, Frequent urination, Bladder control problems, Painful urination, None
       
-      Si la respuesta es 'Sí', pide detalles específicos. Si la respuesta es 'No', reconoce brevemente y pasa INMEDIATAMENTE a la siguiente sección. NO hagas preguntas abiertas.`,
-      skinConditions: `Estás recopilando información sobre las condiciones de la piel del paciente. Preguntas disponibles:
-      - ¿Tiene alguna condición de la piel? (Sí/No + detalles si aplica)
+      MUSCULAR CONDITIONS: Arthritis, Neck Pain, Shoulder Pain, Wrist Pain, Back Pain, Hip Pain, Knee Pain, Ankle Pain, Foot Pain, Cancer, Heel Pain, Ball of Foot/Toe Pain, Plantar Fasciitis, Carpal Tunnel Syndrome, Lupus, Scleroderma, Sciatica, Autoimmune Disease, Muscle Pain Spasm, Fibromyalgia, Broken Bones, Joint Replacement, Nerve Injury, Muscular Dystrophy, Surgery, None
       
-      Si la respuesta es 'Sí', pide detalles específicos. Si la respuesta es 'No', reconoce brevemente y pasa INMEDIATAMENTE a la siguiente sección. NO hagas preguntas abiertas.`,
-      constitutionalConditions: `Estás recopilando información sobre las condiciones constitucionales del paciente. Preguntas disponibles:
-      - ¿Ha experimentado pérdida de cabello? (Sí/No)
+      NEUROLOGICAL CONDITIONS: Migraine Headaches, Balance Disturbance, Seizure or Convulsions, Weakness, Stroke, Alzheimer's, Pseudo Tumor Cerebral, Multiple Sclerosis, Frequency Severe Headaches, Knocked Unconscious, Surgery, None
       
-      Haz esta pregunta de forma directa.`,
+      BLOOD DISORDERS: Anemia (Iron Deficient), Anemia (Vitamin B12 Deficient), HIV, Low Platelets (Thrombocytopenia), Lymphoma, Swollen Lymph Nodes, Superficial Blood Clot in Leg, Deep Blood Clot in Leg, Blood Clot in Lungs (Pulmonary Embolism), Bleeding Disorder, Blood Transfusion, Blood and Thinning Medicine Use, None
+      
+      ENDOCRINE CONDITIONS: Hypothyroid (low), Hyperthyroid (high/overactive), Goiter, Parathyroid, Elevated Cholesterol, Elevated Triglycerides, Low Blood Sugar, Diabetes (managed by diet or pills), Diabetes (needing insulin shots), "Prediabetes" with elevated blood sugar, Gout, Endocrine Gland Tumor, Cancer of Endocrine Gland, High Calcium Level, Abnormal Facial Hair Growth, None
+      
+      GASTROINTESTINAL CONDITIONS: Heartburn, Hiatal Hernia, Ulcers, Diarrhea, Blood in Stool, Change in Bowel Habit, Constipation, Irritable Bowel, Colitis, Crohns, Hemorrhoids, Fissure, Rectal Bleeding, Black Tarry Stools, Polyps, Abdominal Pain, Enlarged Liver, Cirrhosis/Hepatitis, Gallbladder Problems, Jaundice, Pancreatic Disease, Unusual Vomiting, Surgery, None
+      
+      HEAD AND NECK CONDITIONS: Wear Contacts/Glasses, Vision Problems, Hearing Problems, Sinus Drainage, Neck Lumps, Swallowing Difficulty, Dentures/Partial, Oral Sores, Hoarseness, Head/Neck Surgery, Cancer, None
+      
+      SKIN: Rashes under Skin Folds, Keloids, Poor Wound Healing, Frequent Skin Infections, Surgery, None
+      
+      CONSTITUTIONAL: Fevers, Night Sweats, Anemia, Weight Loss, Chronic Fatigue, Hair Loss (pérdida de cabello) - IMPORTANTE: Pregunta específicamente sobre pérdida de cabello de forma conversacional, por ejemplo: "¿Has notado alguna pérdida de cabello?" o "¿Has experimentado caída del cabello?"
+      
+      Recuerda: Es normal que muchos pacientes digan "No" a la mayoría. Continúa sistemáticamente a través de todos los sistemas de forma conversacional y amigable.`,
+      psychiatricConditions: `Estás recopilando información sobre las condiciones psiquiátricas del paciente. Primero pregunta condición por condición (puede tener múltiples):
+      - Anxiety (Ansiedad) (Sí/No)
+      - Depression (Depresión) (Sí/No)
+      - Arexia (starvation to control weight) (Sí/No)
+      - Bulimia (excessive vomiting to control weight) (Sí/No)
+      - Bipolar Disorder (Sí/No)
+      - Alcoholism (Sí/No)
+      - Drug Dependency (Sí/No)
+      - Schizophrenia (Sí/No)
+      - Other Psychiatric Problems (Sí/No)
+      - Hospitalization for Psychiatric Problems (Sí/No)
+      
+      Luego pregunta las siguientes (Sí/No para cada una):
+      - ¿Ha estado alguna vez en un hospital psiquiátrico?
+      - ¿Ha intentado suicidarse alguna vez?
+      - ¿Ha sido abusado físicamente alguna vez?
+      - ¿Ha visto alguna vez a un psiquiatra o consejero?
+      - ¿Ha tomado alguna vez medicamentos para problemas psiquiátricos o para la depresión?
+      - ¿Ha estado alguna vez en un programa de dependencia química?
+      
+      Pregunta de forma natural, agrupando. Si dice "No" a todas, reconoce brevemente y pasa INMEDIATAMENTE a la siguiente sección.`,
+      gastrointestinalConditions: `Esta sección ya está cubierta en currentMedicalConditions bajo GASTROINTESTINAL CONDITIONS. No preguntes esto por separado.`,
+      headAndNeckConditions: `Esta sección ya está cubierta en currentMedicalConditions bajo HEAD AND NECK CONDITIONS. No preguntes esto por separado.`,
+      skinConditions: `Esta sección ya está cubierta en currentMedicalConditions bajo SKIN. No preguntes esto por separado.`,
+      constitutionalConditions: `Esta sección ya está cubierta en currentMedicalConditions bajo CONSTITUTIONAL. No preguntes esto por separado.`,
       infectiousDiseases: `Estás recopilando información sobre enfermedades infecciosas del paciente. Preguntas disponibles:
-      - ¿Ha tenido hepatitis alguna vez? (Sí/No)
+      - ¿Ha tenido hepatitis alguna vez? (Sí/No) → Si "Sí": ¿Qué tipo? (B, C, o ambas)
       - ¿Tiene VIH? (Sí/No)
       
       AGRUPA estas preguntas de forma natural.`,
@@ -345,53 +644,73 @@ INSTRUCTIONS:
       - ¿Se niega a recibir transfusiones de sangre? (Sí/No)
       
       Haz esta pregunta de forma directa.`,
-      socialHistory: `You are collecting the patient's social history regarding tobacco, alcohol, drug, and caffeine use. Available questions:
-      - TOBACCO: Do you currently smoke? (Yes/No), cigarettes/packs per day, snuff/chewing tobacco, vape/e-cigarette, years of use, if quit how long ago
-      - ALCOHOL: Do you currently consume alcohol? (Yes/No), times per week, drinks each time, years of consumption, if quit how long ago, is anyone concerned about the amount?
-      - DRUGS: Do you currently use street drugs? (Yes/No), which drugs, frequency, if quit how long ago
-      - CAFFEINE: Do you drink caffeinated beverages? (Yes/No), cups per day, type of drink; do you drink carbonated beverages? types and amount per day
+      socialHistory: `Estás recopilando el historial social del paciente. Pregunta de forma natural, agrupando sub-preguntas relacionadas. Si la respuesta principal es "No", salta las sub-preguntas y pasa a la siguiente sustancia.
       
-      GROUP tobacco questions in 1-2 turns, then alcohol in 1-2 turns, then drugs in 1 turn, then caffeine in 1-2 turns. Skip sub-questions if main answer is 'No'. If the patient says "No" to all substances, acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions like "Is there anything else?" DURING the questionnaire.`,
-      dietaryHabits: `You are collecting the patient's dietary habits. Available questions:
-      - How often do you eat sweets?
-      - How often do you eat fast food?
+      TOBACCO:
+      - ¿Fumas actualmente? (Sí/No) → Si "Sí": ¿Cuántos cigarrillos/paquetes al día?
+      - ¿Usas tabaco en polvo o masticable? (Sí/No)
+      - ¿Usas vape o cigarrillo electrónico? (Sí/No)
+      - ¿Por cuántos años has usado/usaste tabaco?
+      - Si dejó de fumar: ¿Hace cuánto tiempo?
       
-      GROUP these questions in one natural interaction.`,
-      otherSocials: `You are collecting information about other social substances and referrals. Available questions:
-      - Do you use marijuana products? (Yes/No)
-      - Do you use aspirin products? (Yes/No)
-      - Do you use sexual hormones? (Yes/No)
-      - Other substances (Specify)
-      - Referral name (if applicable)
+      ALCOHOL:
+      - ¿Consumes alcohol actualmente? (Sí/No) → Si "Sí": ¿Cuántas veces por semana? ¿Cuántas bebidas cada vez?
+      - ¿Por cuántos años has consumido/consumiste alcohol?
+      - Si dejó de beber: ¿Hace cuánto tiempo?
+      - ¿Alguien está preocupado por la cantidad que bebes? (Sí/No)
       
-      GROUP these questions in one natural interaction.`,
-      surgicalHistory: `You are collecting the patient's past surgical history. Available questions:
-      - Past surgical history
+      DRUGS:
+      - ¿Usas drogas callejeras actualmente? (Sí/No) → Si "Sí": ¿Cuáles? ¿Con qué frecuencia?
+      - Si dejó de usar: ¿Hace cuánto tiempo?
       
-      Ask this question directly and naturally.`,
-      womenOnly: `You are collecting information specific to women. Available questions:
-      - Date of menstrual cycle
-      - Do you use any hormonal contraception? (Yes/No)
-      - List pregnancies, dates and outcomes
+      CAFFEINE:
+      - ¿Bebes café u otras bebidas con cafeína? (Sí/No) → Si "Sí": ¿Cuántas tazas al día? ¿Qué tipo de bebida?
+      - ¿Bebes bebidas carbonatadas? (Sí/No) → Si "Sí": ¿Qué tipos y cuántas al día?
       
-      GROUP these questions in one natural interaction, but only ask if the patient is female.`,
-      medications: `You are collecting the patient's current medications. Available questions:
-      - Current medications
+      Si el paciente dice "No" a todas las sustancias, reconoce brevemente y pasa INMEDIATAMENTE a la siguiente sección.`,
+      dietaryHabits: `Estás recopilando los hábitos alimenticios del paciente. Preguntas disponibles:
+      - ¿Con qué frecuencia comes dulces?
+      - ¿Con qué frecuencia comes comida rápida?
       
-      Ask this question directly and naturally.`,
-      allergies: `You are collecting the patient's allergies. Available questions:
-      - Allergies
+      AGRUPA estas preguntas en una interacción natural.`,
+      otherSocials: `Estás recopilando información sobre otras sustancias sociales y referencias. Preguntas disponibles:
+      - ¿Usas productos de marihuana? (Sí/No)
+      - ¿Usas productos de aspirina? (Sí/No)
+      - ¿Usas hormonas sexuales? (incluyendo control de natalidad o reemplazo hormonal) (Sí/No)
+      - Otras sustancias (especificar)
+      - ¿Alguien te refirió a nosotros? (campo de texto: nombre de la persona)
       
-      Ask this question directly and naturally.`,
-      dietProgram: `You are collecting information about the patient's diet program. Available questions:
-      - What is the name of the diet?
-      - When did you start it?
-      - How long did you follow it?
-      - How much weight did you lose?
-      - If there was weight regain, how much was it?
+      AGRUPA estas preguntas en una interacción natural.`,
+      surgicalHistory: `Estás recopilando el historial quirúrgico previo del paciente. CRÍTICO: DEBES INDAGAR con preguntas independientes para obtener una lista completa.
       
-      GROUP these questions in one natural interaction.`,
-      pgwbi: `You are collecting the Psychological General Well-Being Index (PGWBI) information. Available questions:
+      Para cada cirugía necesitas: Type of Surgery / Surgeon / Hospital / Date / Did you experience any complications?
+      
+      Indaga así: "¿Has tenido alguna cirugía anteriormente?" Si dice "Sí", pregunta una por una: "¿Qué tipo de cirugía fue?", "¿Quién fue tu cirujano?", "¿En qué hospital o clínica?", "¿En qué fecha fue?", "¿Tuviste alguna complicación?". Continúa preguntando "¿Has tenido alguna otra cirugía?" hasta que diga que no hay más.`,
+      womenOnly: `Estás recopilando información específica para mujeres. SOLO pregunta si el paciente es mujer. Preguntas disponibles:
+      - Fecha del ciclo menstrual
+      - ¿Usas algún método anticonceptivo hormonal? (por ejemplo, control de natalidad) (Sí/No)
+      - Lista de embarazos, fechas y resultados (ejemplo: full term, premature, C-section, miscarriage)
+      
+      Para embarazos, indaga con preguntas independientes: "¿Has tenido embarazos?" Si dice "Sí", pregunta uno por uno: "¿Cuál fue el resultado?", "¿En qué fecha?", "¿Qué fue el resultado?". Continúa hasta que diga que no hay más.`,
+      medications: `Estás recopilando los medicamentos actuales del paciente. CRÍTICO: DEBES INDAGAR con preguntas independientes para obtener una lista completa. NO solo preguntes "¿Qué medicamentos tomas?".
+      
+      Para cada medicamento necesitas: Medications / Dose / How Often Medication Is Taken / Reason for Taking Medication / How Long Have You Been Taking This Medication?
+      
+      Indaga así: "¿Tomas algún medicamento actualmente?" Si dice "Sí", pregunta uno por uno: "¿Qué medicamento?", "¿Cuál es la dosis?", "¿Con qué frecuencia lo tomas?", "¿Por qué razón lo tomas?", "¿Desde cuándo lo tomas?". Continúa preguntando "¿Tomas algún otro medicamento?" hasta que diga que no hay más. Si dice "No", reconoce brevemente y pasa a la siguiente sección.`,
+      allergies: `Estás recopilando las alergias del paciente. CRÍTICO: DEBES INDAGAR con preguntas independientes para obtener una lista completa. NO solo preguntes "¿Tienes alergias?".
+      
+      Para cada alergia necesitas: Medication | Food | Latex / Type Of Reaction / Current Treatment for Allergy
+      
+      Indaga así: "¿Tienes alguna alergia?" Si dice "Sí", pregunta una por una: "¿A qué eres alérgico? (medicamento, alimento, látex)", "¿Qué tipo de reacción tienes?", "¿Cuál es el tratamiento actual para esta alergia?". Continúa preguntando "¿Tienes alguna otra alergia?" hasta que diga que no hay más. Si dice "No", reconoce brevemente y pasa a la siguiente sección.`,
+      dietProgram: `Estás recopilando información sobre los programas de dieta del paciente. Puede haber múltiples dietas. Para cada dieta pregunta:
+      - ¿Cuál es el nombre de la dieta?
+      - ¿Cuándo la comenzaste?
+      - ¿Por cuánto tiempo la seguiste?
+      - ¿Cuánto peso perdiste?
+      - Si hubo recuperación de peso: ¿Cuánto peso recuperaste?
+      
+      Indaga así: "¿Has intentado algún método de pérdida de peso o dieta?" Si dice "Sí", pregunta los detalles de la primera dieta. Luego pregunta "¿Has probado alguna otra dieta o método?" y continúa hasta que diga que no hay más.`,
+      pgwbi: `Estás recopilando el Psychological General Well-Being Index (PGWBI). Todas las preguntas se refieren a "durante el último mes". Preguntas disponibles:
       - Have you been bothered by nervousness or your "nerves"? (during the past month)
       - How much energy, pop, or vitality did you have or feel? (during the past month)
       - I felt downhearted and blue (during the past month)
@@ -411,18 +730,18 @@ INSTRUCTIONS:
       - I felt tired, worn out, used up or exhausted during the past month?
       - Have you been under or felt you were under any strain, stress, or pressure? (during the past month)
       
-      GROUP these questions in 4-5 natural interactions. These are psychological well-being questions about the past month.`,
-      additionalComments: `You are collecting any additional comments from the patient. Available questions:
-      - Additional comments
+      AGRUPA estas preguntas en 4-5 interacciones naturales. Estas son preguntas de bienestar psicológico sobre el último mes.`,
+      additionalComments: `Estás recopilando comentarios adicionales del paciente. Pregunta:
+      - ¿Hay algo más que quieras añadir?
       
-      Ask this question directly and naturally. This is optional.`,
-      termsAndConditions: `You are confirming the patient has read and accepted the terms and conditions. Available questions:
-      - I have read and accepted the terms and conditions
+      Esta pregunta es opcional. Hazla de forma natural y directa.`,
+      termsAndConditions: `Estás confirmando que el paciente ha leído y aceptado los términos y condiciones. Pregunta:
+      - He leído y acepto los Términos y Condiciones
       
-      Ask this question directly and confirm acceptance. This is the LAST question of the questionnaire. AFTER the patient accepts the terms and conditions, the questionnaire is COMPLETE. ONLY THEN can you ask open-ended questions like "Is there anything else you'd like to discuss?" or "Do you have any questions for me?"`,
-      medical: "You are collecting detailed medical history from the patient.",
-      surgical: "You are collecting information about the patient's surgical interest.",
-      weight: "You are collecting the patient's weight history."
+      Haz esta pregunta directamente y confirma la aceptación. Esta es la ÚLTIMA pregunta del cuestionario. DESPUÉS de que el paciente acepte los términos y condiciones, el cuestionario está COMPLETO. SOLO ENTONCES puedes hacer preguntas abiertas como "¿Hay algo más que te gustaría discutir?" o "¿Tienes alguna pregunta para mí?". También necesitas confirmar la firma digital del paciente.`,
+      medical: "Estás recopilando el historial médico detallado del paciente.",
+      surgical: "Estás recopilando información sobre el interés quirúrgico del paciente.",
+      weight: "Estás recopilando el historial de peso del paciente."
     },
     en: {
       general: "You are starting a conversation to collect general medical information from the patient.",
@@ -440,16 +759,22 @@ INSTRUCTIONS:
       
       Ask questions conversationally, one by one, and confirm each response before continuing.`,
       survey: `You are collecting information about how the patient heard about us. Available questions:
-      - How did they hear about us (Instagram, Facebook, Google, Referred, Other)
+      - How did they hear about us (can select multiple): Instagram, YouTube, Google Search, Recommended by a friend or patient, Doctor referral, WhatsApp, Other
       - If they chose "Other", specify how
+      - Who referred you to us? (separate text field)
       
-      Ask questions conversationally and naturally.`,
+      Ask questions conversationally and naturally. Allow multiple selections if they mention several options.`,
       contact: `You are collecting the patient's contact information. Available questions:
       - Phone number
       - Email  
       - Preferred contact method (Text, Call, Email)
       
       GROUP these questions in one interaction to make it more natural. For example: "Could you give me your phone number and email?"`,
+      insurance: `You are collecting the patient's insurance information. Available questions:
+      - Do you have medical insurance? (Yes/No)
+      - If "Yes": Insurance Provider, Policy Number, Group Number
+      
+      If they say "No", acknowledge briefly and move to the next section. If "Yes", ask for the details.`,
       work: `You are collecting the patient's work and educational information. Available questions:
       - Current occupation
       - Employer
@@ -464,7 +789,7 @@ INSTRUCTIONS:
       - BMI (automatically calculated)
       
       GROUP these questions naturally. For example: "To calculate your BMI, could you tell me your height in feet and inches and your weight in pounds?"`,
-      emergency: `You are collecting the patient's emergency contact information. Available questions:
+      emergency: `IMPORTANT: This section is asked AT THE END, AFTER determining the patient's surgical procedure. You are collecting the patient's emergency contact information. Available questions:
       - Emergency contact first name
       - Emergency contact last name
       - Relationship to the patient
@@ -478,46 +803,74 @@ INSTRUCTIONS:
       - Type of surgery or consultation (if applicable)
       
       Ask questions conversationally and handle conditional responses naturally.`,
-      familyHistory: `You are collecting the patient's family history. Available questions:
-      - Heart disease, diabetes, alcoholism, lung problems
-      - Gallstones, malignant hyperthermia, pulmonary edema
-      - High blood pressure, liver problems, bleeding disorders
-      - Mental illness, cancer
+      familyHistory: `You are collecting the patient's family history. IMPORTANT: Ask in a CONVERSATIONAL way, NOT like a form. You must ask condition by condition (Yes/No for each):
+      - Heart disease
+      - Alcoholism
+      - Gallstones
+      - Pulmonary edema
+      - Liver problems
+      - Mental Illness
+      - Diabetes Mellitus
+      - Lung problems
+      - Malignant hyperthermia
+      - High blood pressure
+      - Bleeding disorder
+      - Cancer
       
-      GROUP these questions in one interaction to make it more natural. If the patient says "No" to all, acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions like "is there anything else?".`,
-      medicalHistory: `You are collecting the patient's personal medical history. Available questions:
-      - Sleep apnea (Yes/No)
-      - Diabetes (Yes/No)
-      - Insulin use (if they have diabetes)
-      - CPAP use (if they have sleep apnea)
-      - BiPAP use (if they use CPAP)
+      Ask naturally and conversationally, grouping 2-3 related conditions. Vary your way of asking, for example: "Is there any family history of heart disease or diabetes?" instead of listing options. If the patient says "No" to all, acknowledge briefly and IMMEDIATELY move to the next section naturally. NEVER ask open-ended questions like "is there anything else?".`,
+      medicalHistory: `You are collecting the patient's personal medical history. IMPORTANT: Ask in a CONVERSATIONAL way, NOT like a form. Ask condition by condition (can have multiple):
+      - Diabetes Mellitus (Yes/No) → If "Yes": Do you use insulin? (Yes/No)
+      - High Blood Pressure (Yes/No)
+      - Sleep Apnea (Yes/No) → If "Yes": Do you use CPAP or BiPAP? (Yes/No) → If "Yes": How many hours per night?
+      - Polycystic Ovarian Syndrome (Yes/No)
+      - Metabolic Syndrome (Yes/No)
+      - Reflux Disease (Yes/No)
+      - Degenerative Joint Disease (Yes/No)
+      - Urinary Stress Incontinence (Yes/No)
+      - High Cholesterol (Yes/No)
+      - Venous Stasis (Leg Swelling) (Yes/No)
+      - Irregular Menstrual Period (Yes/No)
       
-      GROUP these questions naturally. For example: "Have you been diagnosed with sleep apnea or diabetes?"`,
-      additionalMedical: `You are collecting other medical conditions from the patient. Available questions:
-      - Other medical conditions or hospitalizations (non-surgical)
+      Ask naturally and conversationally, grouping 2-3 related conditions. Vary your way of asking, for example: "Have you ever been diagnosed with diabetes or high blood pressure?" instead of listing options. If they say "No" to a condition, move immediately to the next naturally.`,
+      additionalMedical: `You are collecting other medical conditions or non-surgical hospitalizations from the patient.
+      For each condition, you need: Condition or Illness Treated / Treating Doctor / Hospital or Clinic / Year of Diagnosis or Treatment Start / Duration of Treatment
       
-      Ask this question openly and naturally.`,
+      Indaga with independent questions: "Have you had other medical conditions or non-surgical hospitalizations?" If they say "Yes", ask one by one: "What condition?", "Who was your treating doctor?", "What hospital or clinic?", "What year?", "How long was the treatment?". Continue until they say there are no more.`,
       surgicalInterest: `You are collecting the patient's surgical interest. Available questions:
-      - Type of surgery of interest (first-time bariatric, revisional bariatric, primary plastic, post-bariatric plastic)
-      - Specific surgery name (according to the selected type)
+      - Type of surgery of interest: First-time Bariatric Surgery, Revisional Bariatric Surgery, Primary Plastic Surgery, Post Bariatric Plastic Surgery, Metabolic Rehab
+      - According to selected type:
+        * First-time Bariatric: Select procedure (Gastric Sleeve, Gastric Bypass, SADI-S/SASI-S)
+        * Revisional Bariatric: Select procedure (Band to Sleeve, Band to Bypass, Sleeve to Bypass, Bypass Revision)
+        * Primary Plastic: Select procedures (multiple: Lipo BBL, Abdominoplasty, Breast Augmentation, Brachioplasty, Torsoplasty, etc.)
+        * Post Bariatric Plastic: Select procedures (multiple, similar to Primary Plastic)
+        * Metabolic Rehab: No procedure selection needed
+      - How far are you in the process? (Just researching, Consultation scheduled, Pre-op appointments, Ready to schedule, Surgery scheduled)
+      - Surgeon Preference (No preference, Specific surgeon, Specific clinic, Other)
+      - Additional Procedures of Interest (only for Revisional Bariatric and Post Bariatric Plastic)
+      - Estimated date of surgery
       
-      Ask questions conversationally, guiding the user through the options and asking for specific details when necessary.`,
-      weightHistory: `You are collecting the patient's weight history. Available questions:
-      - Highest weight and date
-      - Surgery weight (if applicable)
-      - Lowest weight and date
-      - Current weight and time maintained
-      - Goal weight and target date
-      - Weight regained, date and time (if applicable)
+      Ask questions conversationally, guiding the user through the options.`,
+      weightHistory: `You are collecting the patient's weight history. IMPORTANT: Content changes based on surgery type:
+      
+      For First-time Bariatric Surgery:
+      - Highest Weight (HW) and date
+      - Lowest Weight (LW) and date
+      - Current Weight (CW) and "How long have you maintained your CW?"
+      - Goal Weight (GW)
+      
+      For Revisional Bariatric Surgery or Post Bariatric Plastic Surgery:
+      - Highest Weight (HW) and date
+      - Surgery Weight (SW) - weight at time of previous surgery
+      - Lowest Weight (LW) and date
+      - Current Weight (CW) and "How long have you maintained your CW?"
+      - Goal Weight (GW) and "When do you aim to reach your GW?"
+      - Weight Regained (WR): amount, date (year), and "In how much time?"
+      
+      For Primary Plastic Surgery or Metabolic Rehab:
+      - DO NOT ask weight history (this section does not apply)
       
       GROUP these questions naturally. For example: "What has been your highest weight and when was it?"`,
-      surgeryDetails: `You are collecting the patient's surgery details. Available questions:
-      - Stage of surgery process (just starting, consultation scheduled, pre-op appointments, ready to schedule, surgery scheduled)
-      - Surgeon preference (no preference, specific surgeon, specific clinic, other)
-      - Additional procedures of interest
-      - Estimated surgery date
-      
-      Ask questions conversationally, explaining the available options.`,
+      surgeryDetails: `You are collecting the patient's surgery details. This information is already included in surgicalInterest. Do not ask this separately.`,
       gerdInformation: `You are collecting information about the patient's gastroesophageal reflux disease (GERD). Available questions:
       - Frequency of heartburn (per week)
       - Frequency of regurgitation (per week)
@@ -528,43 +881,58 @@ INSTRUCTIONS:
       - If upper GI endoscopy, esophageal manometry or 24-hour pH monitoring has been performed, and their dates and findings
       
       GROUP the GERD symptom frequency questions in one interaction. Then, ask about GERD diagnostic tests, grouping the 'when' and 'findings' questions if the answer is 'yes'.`,
-      currentMedicalConditions: `You are collecting the patient's current medical conditions. Available questions:
-      - High blood pressure (Yes/No)
-      - Sleep apnea (Yes/No)
-      - Urinary conditions (Yes/No + details if applicable)
-      - Muscular conditions (Yes/No + details if applicable)
-      - Neurological conditions (Yes/No + details if applicable)
-      - Blood disorders (Yes/No + details if applicable)
-      - Endocrine conditions (Yes/No + details if applicable)
+      currentMedicalConditions: `You are collecting the patient's current medical conditions by system. IMPORTANT: Ask in a CONVERSATIONAL way, NOT like a form. You must ask condition by condition (can have multiple). Ask naturally and conversationally, grouping 2-4 related conditions per system. If they say "No" to all conditions in a system, move immediately to the next system naturally.
       
-      GROUP the main questions in one interaction. If the patient says "No" to a condition, acknowledge briefly and IMMEDIATELY move to the next question or section. ONLY ask for details if the answer is 'Yes'. NEVER ask open-ended questions like "is there anything else?".`,
-      psychiatricConditions: `You are collecting information about the patient's psychiatric conditions. Available questions:
-      - Have you ever been in a psychiatric hospital? (Yes/No)
-      - Have you ever attempted suicide? (Yes/No)
-      - Have you ever been physically abused? (Yes/No)
-      - Have you ever seen a psychiatrist or counselor? (Yes/No)
-      - Have you ever taken medications for psychiatric problems or depression? (Yes/No)
-      - Have you ever been in a chemical dependency program? (Yes/No)
+      HEART PROBLEMS: Heart attack, Angina, Rhythm Disturbance/Palpitations, Congestive Heart Failure, High Blood Pressure, Ankle Swelling, Varicose Veins, Hemorrhoids, Phlebitis, Ankle/Leg Ulcers, Heart Bypass/Valve Replacement, Pacemaker, Clogged Heart Arteries, Rheumatic Fever/Valve Damage, Heart Murmur, Irregular Heart Beat, Cramping in legs when walking, Other symptoms, None
       
-      GROUP these questions naturally in one or two interactions. If the patient says "No" to all or some, acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions like "is there anything else?".`,
-      gastrointestinalConditions: `You are collecting information about the patient's gastrointestinal conditions. Available questions:
-      - Do you have any gastrointestinal conditions? (Yes/No + details if applicable)
+      RESPIRATORY PROBLEMS: Respiratory, Asthma, Emphysema, Bronchitis, Pneumonia, Chronic Cough, Short of Breath, Use of CPAP or oxygen supplement, Tuberculosis, Pulmonary Embolism, Hypoventilation Syndrome, Cough up Blood, Snoring, Sleep Apnea, Lung Surgery, Lung Cancer, None
       
-      If the answer is 'Yes', ask for specific details. If the answer is 'No', acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions.`,
-      headAndNeckConditions: `You are collecting information about the patient's head and neck conditions. Available questions:
-      - Do you have any head and neck conditions? (Yes/No + details if applicable)
+      URINARY CONDITIONS: Kidney stones, Frequent urination, Bladder control problems, Painful urination, None
       
-      If the answer is 'Yes', ask for specific details. If the answer is 'No', acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions.`,
-      skinConditions: `You are collecting information about the patient's skin conditions. Available questions:
-      - Do you have any skin conditions? (Yes/No + details if applicable)
+      MUSCULAR CONDITIONS: Arthritis, Neck Pain, Shoulder Pain, Wrist Pain, Back Pain, Hip Pain, Knee Pain, Ankle Pain, Foot Pain, Cancer, Heel Pain, Ball of Foot/Toe Pain, Plantar Fasciitis, Carpal Tunnel Syndrome, Lupus, Scleroderma, Sciatica, Autoimmune Disease, Muscle Pain Spasm, Fibromyalgia, Broken Bones, Joint Replacement, Nerve Injury, Muscular Dystrophy, Surgery, None
       
-      If the answer is 'Yes', ask for specific details. If the answer is 'No', acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions.`,
-      constitutionalConditions: `You are collecting information about the patient's constitutional conditions. Available questions:
-      - Have you experienced hair loss? (Yes/No)
+      NEUROLOGICAL CONDITIONS: Migraine Headaches, Balance Disturbance, Seizure or Convulsions, Weakness, Stroke, Alzheimer's, Pseudo Tumor Cerebral, Multiple Sclerosis, Frequency Severe Headaches, Knocked Unconscious, Surgery, None
       
-      Ask this question directly.`,
+      BLOOD DISORDERS: Anemia (Iron Deficient), Anemia (Vitamin B12 Deficient), HIV, Low Platelets (Thrombocytopenia), Lymphoma, Swollen Lymph Nodes, Superficial Blood Clot in Leg, Deep Blood Clot in Leg, Blood Clot in Lungs (Pulmonary Embolism), Bleeding Disorder, Blood Transfusion, Blood and Thinning Medicine Use, None
+      
+      ENDOCRINE CONDITIONS: Hypothyroid (low), Hyperthyroid (high/overactive), Goiter, Parathyroid, Elevated Cholesterol, Elevated Triglycerides, Low Blood Sugar, Diabetes (managed by diet or pills), Diabetes (needing insulin shots), "Prediabetes" with elevated blood sugar, Gout, Endocrine Gland Tumor, Cancer of Endocrine Gland, High Calcium Level, Abnormal Facial Hair Growth, None
+      
+      GASTROINTESTINAL CONDITIONS: Heartburn, Hiatal Hernia, Ulcers, Diarrhea, Blood in Stool, Change in Bowel Habit, Constipation, Irritable Bowel, Colitis, Crohns, Hemorrhoids, Fissure, Rectal Bleeding, Black Tarry Stools, Polyps, Abdominal Pain, Enlarged Liver, Cirrhosis/Hepatitis, Gallbladder Problems, Jaundice, Pancreatic Disease, Unusual Vomiting, Surgery, None
+      
+      HEAD AND NECK CONDITIONS: Wear Contacts/Glasses, Vision Problems, Hearing Problems, Sinus Drainage, Neck Lumps, Swallowing Difficulty, Dentures/Partial, Oral Sores, Hoarseness, Head/Neck Surgery, Cancer, None
+      
+      SKIN: Rashes under Skin Folds, Keloids, Poor Wound Healing, Frequent Skin Infections, Surgery, None
+      
+      CONSTITUTIONAL: Fevers, Night Sweats, Anemia, Weight Loss, Chronic Fatigue, Hair Loss - IMPORTANT: Ask specifically about hair loss in a conversational way, for example: "Have you noticed any hair loss?" or "Have you experienced hair loss?"
+      
+      Remember: It's normal for many patients to say "No" to most. Continue systematically through all systems in a conversational and friendly way.`,
+      psychiatricConditions: `You are collecting information about the patient's psychiatric conditions. First ask condition by condition (can have multiple):
+      - Anxiety (Yes/No)
+      - Depression (Yes/No)
+      - Arexia (starvation to control weight) (Yes/No)
+      - Bulimia (excessive vomiting to control weight) (Yes/No)
+      - Bipolar Disorder (Yes/No)
+      - Alcoholism (Yes/No)
+      - Drug Dependency (Yes/No)
+      - Schizophrenia (Yes/No)
+      - Other Psychiatric Problems (Yes/No)
+      - Hospitalization for Psychiatric Problems (Yes/No)
+      
+      Then ask the following (Yes/No for each):
+      - Have you ever been in a psychiatric hospital?
+      - Have you ever attempted suicide?
+      - Have you ever been physically abused?
+      - Have you ever seen a psychiatrist or counselor?
+      - Have you ever taken medications for psychiatric problems or depression?
+      - Have you ever been in a chemical dependency program?
+      
+      Ask naturally, grouping. If they say "No" to all, acknowledge briefly and IMMEDIATELY move to the next section.`,
+      gastrointestinalConditions: `This section is already covered in currentMedicalConditions under GASTROINTESTINAL CONDITIONS. Do not ask this separately.`,
+      headAndNeckConditions: `This section is already covered in currentMedicalConditions under HEAD AND NECK CONDITIONS. Do not ask this separately.`,
+      skinConditions: `This section is already covered in currentMedicalConditions under SKIN. Do not ask this separately.`,
+      constitutionalConditions: `This section is already covered in currentMedicalConditions under CONSTITUTIONAL. Do not ask this separately.`,
       infectiousDiseases: `You are collecting information about the patient's infectious diseases. Available questions:
-      - Have you ever had hepatitis? (Yes/No)
+      - Have you ever had hepatitis? (Yes/No) → If "Yes": What type? (B, C, or both)
       - Do you have HIV? (Yes/No)
       
       GROUP these questions naturally.`,
@@ -572,13 +940,30 @@ INSTRUCTIONS:
       - Do you refuse blood transfusions? (Yes/No)
       
       Ask this question directly.`,
-      socialHistory: `You are collecting the patient's social history regarding tobacco, alcohol, drug, and caffeine use. Available questions:
-      - TOBACCO: Do you currently smoke? (Yes/No), cigarettes/packs per day, snuff/chewing tobacco, vape/e-cigarette, years of use, if quit how long ago
-      - ALCOHOL: Do you currently consume alcohol? (Yes/No), times per week, drinks each time, years of consumption, if quit how long ago, is anyone concerned about the amount?
-      - DRUGS: Do you currently use street drugs? (Yes/No), which drugs, frequency, if quit how long ago
-      - CAFFEINE: Do you drink caffeinated beverages? (Yes/No), cups per day, type of drink; do you drink carbonated beverages? types and amount per day
+      socialHistory: `You are collecting the patient's social history. Ask naturally, grouping related sub-questions. If the main answer is "No", skip sub-questions and move to the next substance.
       
-      GROUP tobacco questions in 1-2 turns, then alcohol in 1-2 turns, then drugs in 1 turn, then caffeine in 1-2 turns. Skip sub-questions if main answer is 'No'. If the patient says "No" to all substances, acknowledge briefly and IMMEDIATELY move to the next section. NEVER ask open-ended questions like "Is there anything else?" DURING the questionnaire.`,
+      TOBACCO:
+      - Do you currently smoke? (Yes/No) → If "Yes": How many cigarettes/packs per day?
+      - Do you use snuff or chew tobacco? (Yes/No)
+      - Do you use a vape or e-cigarette? (Yes/No)
+      - For how many years have/did you use tobacco?
+      - If you quit: How long ago?
+      
+      ALCOHOL:
+      - Do you consume alcohol now? (Yes/No) → If "Yes": How many times per week? How many drinks each time?
+      - For how many years do/did you drink alcohol?
+      - If you quit: How long ago?
+      - Is anyone concerned about the amount you drink? (Yes/No)
+      
+      DRUGS:
+      - Do you use street drugs now? (Yes/No) → If "Yes": Which drugs? How often?
+      - If you quit: How long ago?
+      
+      CAFFEINE:
+      - Do you drink coffee or other caffeine-containing beverages? (Yes/No) → If "Yes": How many cups per day? What type of drink?
+      - Do you drink carbonated beverages? (Yes/No) → If "Yes": What types and how many per day?
+      
+      If the patient says "No" to all substances, acknowledge briefly and IMMEDIATELY move to the next section.`,
       dietaryHabits: `You are collecting the patient's dietary habits. Available questions:
       - How often do you eat sweets?
       - How often do you eat fast food?
@@ -587,38 +972,41 @@ INSTRUCTIONS:
       otherSocials: `You are collecting information about other social substances and referrals. Available questions:
       - Do you use marijuana products? (Yes/No)
       - Do you use aspirin products? (Yes/No)
-      - Do you use sexual hormones? (Yes/No)
+      - Do you use sexual hormones? (including birth control or hormonal replacement) (Yes/No)
       - Other substances (Specify)
-      - Referral name (if applicable)
+      - Did someone refer you to us? (text field: name of the person)
       
       GROUP these questions in one natural interaction.`,
-      surgicalHistory: `You are collecting the patient's past surgical history. Available questions:
-      - Past surgical history
+      surgicalHistory: `You are collecting the patient's past surgical history. CRITICAL: YOU MUST INQUIRE with independent questions to get a complete list.
       
-      Ask this question directly and naturally.`,
-      womenOnly: `You are collecting information specific to women. Available questions:
+      For each surgery you need: Type of Surgery / Surgeon / Hospital / Date / Did you experience any complications?
+      
+      Inquire like this: "Have you had any surgeries before?" If they say "Yes", ask one by one: "What type of surgery was it?", "Who was your surgeon?", "What hospital or clinic?", "What date was it?", "Did you experience any complications?". Continue asking "Have you had any other surgeries?" until they say there are no more.`,
+      womenOnly: `You are collecting information specific to women. ONLY ask if the patient is female. Available questions:
       - Date of menstrual cycle
-      - Do you use any hormonal contraception? (Yes/No)
-      - List pregnancies, dates and outcomes
+      - Do you use any hormonal contraception? (e.g., birth control) (Yes/No)
+      - List pregnancies, dates and outcomes (example: full term, premature, C-section, miscarriage)
       
-      GROUP these questions in one natural interaction, but only ask if the patient is female.`,
-      medications: `You are collecting the patient's current medications. Available questions:
-      - Current medications
+      For pregnancies, inquire with independent questions: "Have you had pregnancies?" If they say "Yes", ask one by one: "What was the outcome?", "What date?", "What was the result?". Continue until they say there are no more.`,
+      medications: `You are collecting the patient's current medications. CRITICAL: YOU MUST INQUIRE with independent questions to get a complete list. DO NOT just ask "What medications do you take?".
       
-      Ask this question directly and naturally.`,
-      allergies: `You are collecting the patient's allergies. Available questions:
-      - Allergies
+      For each medication you need: Medications / Dose / How Often Medication Is Taken / Reason for Taking Medication / How Long Have You Been Taking This Medication?
       
-      Ask this question directly and naturally.`,
-      dietProgram: `You are collecting information about the patient's diet program. Available questions:
+      Inquire like this: "Do you take any medications currently?" If they say "Yes", ask one by one: "What medication?", "What is the dose?", "How often do you take it?", "What is the reason for taking it?", "How long have you been taking it?". Continue asking "Do you take any other medications?" until they say there are no more. If they say "No", acknowledge briefly and move to the next section.`,
+      allergies: `You are collecting the patient's allergies. CRITICAL: YOU MUST INQUIRE with independent questions to get a complete list. DO NOT just ask "Do you have allergies?".
+      
+      For each allergy you need: Medication | Food | Latex / Type Of Reaction / Current Treatment for Allergy
+      
+      Inquire like this: "Do you have any allergies?" If they say "Yes", ask one by one: "What are you allergic to? (medication, food, latex)", "What type of reaction do you have?", "What is the current treatment for this allergy?". Continue asking "Do you have any other allergies?" until they say there are no more. If they say "No", acknowledge briefly and move to the next section.`,
+      dietProgram: `You are collecting information about the patient's diet programs. There can be multiple diets. For each diet ask:
       - What is the name of the diet?
       - When did you start it?
       - How long did you follow it?
       - How much weight did you lose?
-      - If there was weight regain, how much was it?
+      - If there was weight regain: How much weight did you regain?
       
-      GROUP these questions in one natural interaction.`,
-      pgwbi: `You are collecting the Psychological General Well-Being Index (PGWBI) information. Available questions:
+      Inquire like this: "Have you tried any weight loss methods or diets?" If they say "Yes", ask the details of the first diet. Then ask "Have you tried any other diets or methods?" and continue until they say there are no more.`,
+      pgwbi: `You are collecting the Psychological General Well-Being Index (PGWBI). All questions refer to "during the past month". Available questions:
       - Have you been bothered by nervousness or your "nerves"? (during the past month)
       - How much energy, pop, or vitality did you have or feel? (during the past month)
       - I felt downhearted and blue (during the past month)
@@ -639,14 +1027,14 @@ INSTRUCTIONS:
       - Have you been under or felt you were under any strain, stress, or pressure? (during the past month)
       
       GROUP these questions in 4-5 natural interactions. These are psychological well-being questions about the past month.`,
-      additionalComments: `You are collecting any additional comments from the patient. Available questions:
-      - Additional comments
+      additionalComments: `You are collecting any additional comments from the patient. Ask:
+      - Is there anything else you want to add?
       
-      Ask this question directly and naturally. This is optional.`,
-      termsAndConditions: `You are confirming the patient has read and accepted the terms and conditions. Available questions:
-      - I have read and accepted the terms and conditions
+      This question is optional. Ask it naturally and directly.`,
+      termsAndConditions: `You are confirming the patient has read and accepted the terms and conditions. Ask:
+      - I have read and accepted the Terms and Conditions
       
-      Ask this question directly and confirm acceptance. This is the LAST question of the questionnaire. AFTER the patient accepts the terms and conditions, the questionnaire is COMPLETE. ONLY THEN can you ask open-ended questions like "Is there anything else you'd like to discuss?" or "Do you have any questions for me?"`,
+      Ask this question directly and confirm acceptance. This is the LAST question of the questionnaire. AFTER the patient accepts the terms and conditions, the questionnaire is COMPLETE. ONLY THEN can you ask open-ended questions like "Is there anything else you'd like to discuss?" or "Do you have any questions for me?". You also need to confirm the patient's digital signature.`,
       medical: "You are collecting detailed medical history from the patient.",
       surgical: "You are collecting information about the patient's surgical interest.",
       weight: "You are collecting the patient's weight history."
@@ -666,4 +1054,206 @@ ${contextMessage}`;
 
 function generateConversationId(): string {
   return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Extrae datos estructurados de la conversación usando Claude
+ * Se ejecuta después de cada respuesta para guardar datos incrementalmente
+ */
+async function extractStructuredData(
+  sessionId: string,
+  chatSessionService: ChatSessionService,
+  language: 'es' | 'en' = 'en'
+): Promise<Record<string, any>> {
+  try {
+    const session = await chatSessionService.getSession(sessionId);
+    if (!session || !session.messages || session.messages.length === 0) {
+      return {};
+    }
+
+    const API_KEY = process.env.ANTHROPIC_API_KEY;
+    if (!API_KEY) {
+      return {};
+    }
+
+    // Construir el historial de conversación
+    const conversationText = session.messages
+      .map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}`)
+      .join('\n\n');
+    
+    // Log para debugging: mostrar cuántos mensajes hay
+    const userMessages = session.messages.filter(msg => msg.type === 'user');
+    console.log(`📋 Extrayendo datos de conversación: ${session.messages.length} mensajes totales (${userMessages.length} del usuario)`);
+
+    // Construir lista de campos esperados para guiar la extracción
+    const expectedFields = language === 'es'
+      ? `CAMPOS ESPERADOS (usa estos nombres exactos si están presentes en la conversación):
+
+INFORMACIÓN PERSONAL:
+- firstName, lastName, dateOfBirth, age, gender, email, phoneNumber
+- address, addressLine, city, state, country, zipcode, zipCode
+- occupation, employer, education
+- emergencyFirstName, emergencyLastName, emergencyRelationship, emergencyPhone
+- heightFeet, heightInches, heightCm, weightLbs, weightKg, bmi
+- measurementSystem, hearAboutUs, hasInsurance, insuranceProvider
+
+INTERÉS QUIRÚRGICO:
+- surgeryInterest, specificProcedure, surgeryReadiness, surgeonPreference
+- highestWeight, highestWeightDate, currentWeight, goalWeight, lowestWeight
+- previousWeightLossSurgery, previousSurgeonName
+- gerdHeartburn, gerdRegurgitation, medications, allergies, previousSurgeries
+
+HISTORIAL MÉDICO:
+- sleepApnea, useCpap, diabetes, useInsulin, highBloodPressure
+- heartProblems, respiratoryProblems, medications, allergies
+- tobacco, alcohol, drugs, depression, anxiety
+- previousSurgeries, surgicalComplications, pregnancy
+- hepatitis, hepatitisType, hiv
+
+HISTORIAL FAMILIAR:
+- heartDisease, diabetesMellitus, highBloodPressure, cancer`
+
+      : `EXPECTED FIELDS (use these exact names if present in the conversation):
+
+PERSONAL INFORMATION:
+- firstName, lastName, dateOfBirth, age, gender, email, phoneNumber
+- address, addressLine, city, state, country, zipcode, zipCode
+- occupation, employer, education
+- emergencyFirstName, emergencyLastName, emergencyRelationship, emergencyPhone
+- heightFeet, heightInches, heightCm, weightLbs, weightKg, bmi
+- measurementSystem, hearAboutUs, hasInsurance, insuranceProvider
+
+SURGERY INTEREST:
+- surgeryInterest, specificProcedure, surgeryReadiness, surgeonPreference
+- highestWeight, highestWeightDate, currentWeight, goalWeight, lowestWeight
+- previousWeightLossSurgery, previousSurgeonName
+- gerdHeartburn, gerdRegurgitation, medications, allergies, previousSurgeries
+
+MEDICAL HISTORY:
+- sleepApnea, useCpap, diabetes, useInsulin, highBloodPressure
+- heartProblems, respiratoryProblems, medications, allergies
+- tobacco, alcohol, drugs, depression, anxiety
+- previousSurgeries, surgicalComplications, pregnancy
+- hepatitis, hepatitisType, hiv
+
+FAMILY HISTORY:
+- heartDisease, diabetesMellitus, highBloodPressure, cancer`;
+
+    const extractionPrompt = language === 'es' 
+      ? `Analiza la siguiente conversación médica COMPLETA y extrae TODOS los datos estructurados que el paciente ha proporcionado en TODA la conversación.
+
+REGLAS CRÍTICAS DE EXTRACCIÓN:
+- DEBES revisar TODA la conversación desde el principio hasta el final
+- Extrae CADA respuesta que el paciente haya dado, incluso si respondió múltiples preguntas en un solo mensaje
+- Si el paciente dice "sí" o "tengo [condición]", extrae como "yes" o el valor específico proporcionado
+- Si el paciente dice "no" o "no tengo", extrae como "no"
+- Si el paciente menciona un medicamento, alergia, cirugía, condición médica, etc., DEBES extraerlo
+- Para listas (medicamentos, alergias, cirugías), extrae como arrays o strings separados por comas
+- Si el paciente menciona algo que corresponde a un campo de la lista, DEBES incluirlo en el JSON
+- NO omitas datos solo porque ya los extrajiste antes - incluye TODOS los datos de TODA la conversación
+- USA LOS NOMBRES DE CAMPOS EXACTOS de la lista de campos esperados (ver abajo)
+- Si un campo no se ha mencionado en NINGUNA parte de la conversación, NO lo incluyas en el JSON
+
+EJEMPLOS:
+- Si el paciente dice "Tengo diabetes tipo 2" → extrae: {"diabetes": "yes"} o {"diabetes": "type 2"}
+- Si el paciente dice "Tomo metformina 500mg dos veces al día" → extrae: {"medications": "metformina 500mg dos veces al día"}
+- Si el paciente dice "No tengo alergias" → extrae: {"allergies": "no"}
+- Si el paciente dice "Mi peso más alto fue 120kg en 2020" → extrae: {"highestWeight": "120kg", "highestWeightDate": "2020"}
+- Si el paciente responde múltiples cosas: "Tengo diabetes y presión alta, tomo metformina y lisinopril" → extrae: {"diabetes": "yes", "highBloodPressure": "yes", "medications": "metformina, lisinopril"}
+
+${expectedFields}
+
+Conversación COMPLETA:
+${conversationText}
+
+INSTRUCCIÓN FINAL: Revisa CADA mensaje del paciente en la conversación y extrae TODOS los datos que haya proporcionado. No omitas ninguna respuesta. Devuelve ÚNICAMENTE un objeto JSON válido con TODOS los datos extraídos usando los nombres de campos de la lista anterior. Sin texto adicional, solo JSON.`
+      : `Analyze the following COMPLETE medical conversation and extract ALL structured data that the patient has provided throughout the ENTIRE conversation.
+
+CRITICAL EXTRACTION RULES:
+- YOU MUST review the ENTIRE conversation from beginning to end
+- Extract EVERY response the patient has given, even if they answered multiple questions in a single message
+- If patient says "yes" or "I have [condition]", extract as "yes" or the specific value provided
+- If patient says "no" or "I don't have", extract as "no"
+- If patient mentions a medication, allergy, surgery, medical condition, etc., YOU MUST extract it
+- For lists (medications, allergies, surgeries), extract as arrays or comma-separated strings
+- If patient mentions something that corresponds to a field in the list, YOU MUST include it in the JSON
+- DO NOT omit data just because you extracted it before - include ALL data from the ENTIRE conversation
+- USE THE EXACT FIELD NAMES from the expected fields list (see below)
+- If a field has not been mentioned ANYWHERE in the conversation, DO NOT include it in the JSON
+
+EXAMPLES:
+- If patient says "I have type 2 diabetes" → extract: {"diabetes": "yes"} or {"diabetes": "type 2"}
+- If patient says "I take metformin 500mg twice a day" → extract: {"medications": "metformin 500mg twice a day"}
+- If patient says "I have no allergies" → extract: {"allergies": "no"}
+- If patient says "My highest weight was 120kg in 2020" → extract: {"highestWeight": "120kg", "highestWeightDate": "2020"}
+- If patient answers multiple things: "I have diabetes and high blood pressure, I take metformin and lisinopril" → extract: {"diabetes": "yes", "highBloodPressure": "yes", "medications": "metformin, lisinopril"}
+
+${expectedFields}
+
+COMPLETE Conversation:
+${conversationText}
+
+FINAL INSTRUCTION: Review EVERY patient message in the conversation and extract ALL data they have provided. Do not omit any response. Return ONLY a valid JSON object with ALL extracted data using the field names from the list above. No additional text, only JSON.`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 4000, // Aumentado para manejar conversaciones largas y extracciones completas
+        messages: [
+          {
+            role: 'user',
+            content: extractionPrompt
+          }
+        ]
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      
+      if (data.content && data.content[0] && data.content[0].text) {
+        const jsonText = data.content[0].text.trim();
+        
+        // Intentar parsear el JSON (puede venir con markdown code blocks)
+        let jsonData: any = {};
+        
+        try {
+          // Remover markdown code blocks si existen
+          const cleanedText = jsonText
+            .replace(/```json\n?/g, '')
+            .replace(/```\n?/g, '')
+            .trim();
+          
+          jsonData = JSON.parse(cleanedText);
+        } catch (parseError) {
+          // Si falla el parseo, intentar extraer JSON del texto
+          const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              jsonData = JSON.parse(jsonMatch[0]);
+            } catch (e) {
+              console.error('Error parsing extracted JSON:', e);
+              return {};
+            }
+          } else {
+            console.error('No JSON found in extraction response');
+            return {};
+          }
+        }
+
+        return jsonData || {};
+      }
+    }
+
+    return {};
+  } catch (error) {
+    console.error('Error extracting structured data:', error);
+    return {};
+  }
 }

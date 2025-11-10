@@ -21,6 +21,7 @@ export default function AdminPanel() {
     error, 
     approveDoctor, 
     rejectDoctor,
+    getPatientDetails,
     refreshAll
   } = useAdminPanel();
 
@@ -64,7 +65,7 @@ export default function AdminPanel() {
       case 'doctors':
         return <DoctorsTab language={language} doctors={doctors} loading={loading.doctors} error={error} onApprove={approveDoctor} onReject={rejectDoctor} showAddDoctorModal={showAddDoctorModal} setShowAddDoctorModal={setShowAddDoctorModal} refreshAll={refreshAll} />;
       case 'patients':
-        return <PatientsTab language={language} patients={patients} loading={loading.patients} error={error} />;
+        return <PatientsTab language={language} patients={patients} loading={loading.patients} error={error} getPatientDetails={getPatientDetails} />;
       case 'assignments':
         return <AssignmentsTab language={language} assignments={assignments} loading={loading.assignments} error={error} doctors={doctors} />;
       case 'settings':
@@ -751,13 +752,32 @@ function PatientsTab({
   language, 
   patients, 
   loading, 
-  error 
+  error,
+  getPatientDetails
 }: { 
   language: string; 
   patients: PatientSummary[]; 
   loading: boolean; 
-  error: string | null; 
+  error: string | null;
+  getPatientDetails: (patientId: string) => Promise<any>;
 }) {
+  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const handleViewDetails = async (patientId: string) => {
+    setLoadingDetails(true);
+    setShowDetailsModal(true);
+    try {
+      const details = await getPatientDetails(patientId);
+      setSelectedPatient(details);
+    } catch (err) {
+      console.error('Error loading patient details:', err);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -965,7 +985,10 @@ function PatientsTab({
                     {new Date(patient.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button className="text-[#212e5c] hover:text-[#1a2347] bg-gray-50 px-3 py-1 rounded-md hover:bg-gray-100 transition-colors">
+                    <button 
+                      onClick={() => handleViewDetails(patient.patientId)}
+                      className="text-[#212e5c] hover:text-[#1a2347] bg-gray-50 px-3 py-1 rounded-md hover:bg-gray-100 transition-colors"
+                    >
                       {language === 'es' ? 'Ver Detalles' : 'View Details'}
                     </button>
                   </td>
@@ -975,6 +998,346 @@ function PatientsTab({
           </tbody>
         </table>
       </div>
+
+      {/* Modal de Detalles del Paciente */}
+      {showDetailsModal && (
+        <PatientDetailsModal
+          patient={selectedPatient}
+          loading={loadingDetails}
+          language={language}
+          onClose={() => {
+            setShowDetailsModal(false);
+            setSelectedPatient(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Componente Modal de Detalles del Paciente
+function PatientDetailsModal({
+  patient,
+  loading,
+  language,
+  onClose
+}: {
+  patient: any;
+  loading: boolean;
+  language: string;
+  onClose: () => void;
+}) {
+  const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [pdfViewUrl, setPdfViewUrl] = useState<string | null>(null);
+  const { token } = useAuth();
+
+  // Limpiar URL del blob cuando el componente se desmonte o el modal se cierre
+  useEffect(() => {
+    return () => {
+      if (pdfViewUrl) {
+        window.URL.revokeObjectURL(pdfViewUrl);
+      }
+    };
+  }, [pdfViewUrl]);
+
+  const handleGeneratePDF = async (patientId: string, action: 'download' | 'view' = 'download') => {
+    if (!token) {
+      alert(language === 'es' ? 'No hay token de autenticación' : 'No authentication token');
+      return;
+    }
+
+    setGeneratingPDF(true);
+    try {
+      const response = await fetch(`/api/admin/patients/${patientId}/pdf?language=${language}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        // Obtener el blob del PDF
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        
+        if (action === 'view') {
+          // Abrir en nueva ventana para visualizar
+          setPdfViewUrl(url);
+        } else {
+          // Descargar
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `expediente_${patientId}_${patient?.firstName || ''}_${patient?.lastName || ''}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        }
+      } else {
+        // Intentar obtener mensaje de error, pero manejar si no es JSON
+        try {
+          const errorData = await response.json();
+          alert(errorData.message || (language === 'es' ? 'Error al generar PDF' : 'Error generating PDF'));
+        } catch (jsonError) {
+          // Si no es JSON, mostrar mensaje genérico
+          const errorText = await response.text();
+          alert(errorText || (language === 'es' ? 'Error al generar PDF' : 'Error generating PDF'));
+        }
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert(language === 'es' ? 'Error al generar el PDF. Por favor, intenta de nuevo.' : 'Error generating PDF. Please try again.');
+    } finally {
+      setGeneratingPDF(false);
+    }
+  };
+
+  if (!patient && !loading) {
+    return null;
+  }
+
+  const renderSection = (title: string, data: Record<string, unknown> | undefined, source: 'chatbot' | 'form' = 'chatbot') => {
+    if (!data || Object.keys(data).length === 0) return null;
+
+    const borderColor = source === 'chatbot' ? 'border-blue-500' : 'border-green-500';
+    const bgColor = source === 'chatbot' ? 'bg-blue-50' : 'bg-green-50';
+
+    return (
+      <div className="mb-4">
+        <h4 className="text-md font-medium text-gray-700 mb-2">{title}</h4>
+        <div className={`${bgColor} rounded-lg p-4 border-l-4 ${borderColor}`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(data)
+              .filter(([_, value]) => value !== null && value !== undefined && value !== '')
+              .map(([key, value]) => (
+                <div key={key} className="border-b border-gray-200 pb-2">
+                  <div className="text-xs font-medium text-gray-500 uppercase mb-1">
+                    {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                  </div>
+                  <div className="text-sm text-gray-900">
+                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-[#212e5c]">
+            {language === 'es' ? 'Detalles del Paciente' : 'Patient Details'}
+          </h2>
+          <div className="flex items-center gap-3">
+            {patient && (
+              <>
+                <button
+                  onClick={() => handleGeneratePDF(patient.patientId, 'view')}
+                  disabled={generatingPDF}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  {generatingPDF ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      {language === 'es' ? 'Generando...' : 'Generating...'}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      {language === 'es' ? 'Ver PDF' : 'View PDF'}
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleGeneratePDF(patient.patientId, 'download')}
+                  disabled={generatingPDF}
+                  className="flex items-center gap-2 bg-[#212e5c] hover:bg-[#1a2347] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  {generatingPDF ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      {language === 'es' ? 'Generando...' : 'Generating...'}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      {language === 'es' ? 'Descargar PDF' : 'Download PDF'}
+                    </>
+                  )}
+                </button>
+              </>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#212e5c]"></div>
+            </div>
+          ) : patient ? (
+            <>
+              {/* Información Básica */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-[#212e5c] mb-3">
+                  {language === 'es' ? 'Información Básica' : 'Basic Information'}
+                </h3>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs font-medium text-gray-500 uppercase mb-1">
+                        {language === 'es' ? 'Nombre' : 'Name'}
+                      </div>
+                      <div className="text-sm text-gray-900">
+                        {patient.firstName} {patient.lastName}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium text-gray-500 uppercase mb-1">
+                        {language === 'es' ? 'Email' : 'Email'}
+                      </div>
+                      <div className="text-sm text-gray-900">{patient.email}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium text-gray-500 uppercase mb-1">
+                        {language === 'es' ? 'ID de Paciente' : 'Patient ID'}
+                      </div>
+                      <div className="text-sm text-gray-900">{patient.patientId}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Datos del Chatbot */}
+              {patient.chatbotData && (
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="text-lg font-semibold text-[#212e5c]">
+                      {language === 'es' ? 'Datos del Chatbot' : 'Chatbot Data'}
+                    </h3>
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                      🤖 {language === 'es' ? 'Chatbot' : 'Chatbot'}
+                    </span>
+                  </div>
+                  {renderSection(
+                    language === 'es' ? 'Información del Paciente' : 'Patient Information',
+                    patient.chatbotData.patientInfo,
+                    'chatbot'
+                  )}
+                  {renderSection(
+                    language === 'es' ? 'Interés Quirúrgico' : 'Surgery Interest',
+                    patient.chatbotData.surgeryInterest,
+                    'chatbot'
+                  )}
+                  {renderSection(
+                    language === 'es' ? 'Historial Médico' : 'Medical History',
+                    patient.chatbotData.medicalHistory,
+                    'chatbot'
+                  )}
+                  {renderSection(
+                    language === 'es' ? 'Historial Familiar' : 'Family History',
+                    patient.chatbotData.familyHistory,
+                    'chatbot'
+                  )}
+                </div>
+              )}
+
+              {/* Datos de Formularios Tradicionales */}
+              {patient.forms && Object.keys(patient.forms).length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="text-lg font-semibold text-[#212e5c]">
+                      {language === 'es' ? 'Datos del Formulario Tradicional' : 'Traditional Form Data'}
+                    </h3>
+                    <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                      📋 {language === 'es' ? 'Formulario' : 'Form'}
+                    </span>
+                  </div>
+                  {Object.entries(patient.forms).map(([formType, formData]) => (
+                    <div key={formType} className="mb-4">
+                      <h4 className="text-md font-medium text-gray-700 mb-2">{formType}</h4>
+                      <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-green-500">
+                        <pre className="text-xs text-gray-600 overflow-x-auto">
+                          {JSON.stringify(formData, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {(!patient.chatbotData || Object.keys(patient.chatbotData).length === 0) &&
+               (!patient.forms || Object.keys(patient.forms).length === 0) && (
+                <div className="text-center py-12 text-gray-500">
+                  <p>{language === 'es' ? 'No hay datos disponibles' : 'No data available'}</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              <p>{language === 'es' ? 'No se pudieron cargar los detalles' : 'Could not load details'}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal para visualizar PDF */}
+      {pdfViewUrl && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[60] p-0">
+          <div className="bg-white rounded-lg w-full h-full flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200 flex-shrink-0">
+              <h3 className="text-lg font-semibold text-[#212e5c]">
+                {language === 'es' ? 'Expediente Médico' : 'Medical Record'}
+              </h3>
+              <div className="flex items-center gap-2">
+                <a
+                  href={pdfViewUrl}
+                  download={`expediente_${patient?.patientId || ''}_${patient?.firstName || ''}_${patient?.lastName || ''}.pdf`}
+                  className="text-[#212e5c] hover:text-[#1a2347] px-3 py-1 rounded-md hover:bg-gray-100 transition-colors"
+                >
+                  {language === 'es' ? 'Descargar' : 'Download'}
+                </a>
+                <button
+                  onClick={() => {
+                    if (pdfViewUrl) {
+                      window.URL.revokeObjectURL(pdfViewUrl);
+                      setPdfViewUrl(null);
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden min-h-0">
+              <iframe
+                src={pdfViewUrl}
+                className="w-full h-full border-0"
+                title={language === 'es' ? 'Expediente Médico' : 'Medical Record'}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

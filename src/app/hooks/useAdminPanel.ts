@@ -143,6 +143,17 @@ export function useAdminPanel() {
     }
   }, [makeAuthenticatedRequest]);
 
+  // Obtener detalles de un paciente
+  const getPatientDetails = useCallback(async (patientId: string) => {
+    try {
+      const response = await makeAuthenticatedRequest(`/api/admin/patients/${patientId}`);
+      return response.data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar detalles del paciente');
+      return null;
+    }
+  }, [makeAuthenticatedRequest]);
+
   // Aprobar doctor
   const approveDoctor = async (doctorId: number) => {
     try {
@@ -209,6 +220,7 @@ export function useAdminPanel() {
     loadAssignments,
     approveDoctor,
     rejectDoctor,
+    getPatientDetails,
     
     // Utilidades
     refreshAll: async () => {
