@@ -1028,6 +1028,7 @@ function PatientDetailsModal({
   onClose: () => void;
 }) {
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [pdfViewUrl, setPdfViewUrl] = useState<string | null>(null);
   const { token } = useAuth();
 
@@ -1091,6 +1092,37 @@ function PatientDetailsModal({
     }
   };
 
+  const handleSendEmail = async (patientId: string) => {
+    if (!token) {
+      alert(language === 'es' ? 'No hay token de autenticación' : 'No authentication token');
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      const response = await fetch(`/api/admin/patients/${patientId}/send-email?language=${language}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert(language === 'es' ? 'Email enviado exitosamente' : 'Email sent successfully');
+      } else {
+        alert(data.message || (language === 'es' ? 'Error al enviar el email' : 'Error sending email'));
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      alert(language === 'es' ? 'Error al enviar el email. Por favor, intenta de nuevo.' : 'Error sending email. Please try again.');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   if (!patient && !loading) {
     return null;
   }
@@ -1127,11 +1159,11 @@ function PatientDetailsModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-[#212e5c]">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center gap-4">
+          <h2 className="text-2xl font-bold text-[#212e5c] flex-shrink-0">
             {language === 'es' ? 'Detalles del Paciente' : 'Patient Details'}
           </h2>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap flex-shrink-0">
             {patient && (
               <>
                 <button
@@ -1170,6 +1202,25 @@ function PatientDetailsModal({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                       {language === 'es' ? 'Descargar PDF' : 'Download PDF'}
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleSendEmail(patient.patientId)}
+                  disabled={sendingEmail || generatingPDF}
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  {sendingEmail ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      {language === 'es' ? 'Enviando...' : 'Sending...'}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      {language === 'es' ? 'Enviar Email' : 'Send Email'}
                     </>
                   )}
                 </button>

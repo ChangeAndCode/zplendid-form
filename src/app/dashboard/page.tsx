@@ -166,6 +166,7 @@ export default function Dashboard() {
 // Componente para la tarjeta de Expediente Médico
 function MedicalRecordCard({ language, token }: { language: string; token: string }) {
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [pdfViewUrl, setPdfViewUrl] = useState<string | null>(null);
 
   // Limpiar URL del blob cuando el componente se desmonte
@@ -236,6 +237,37 @@ function MedicalRecordCard({ language, token }: { language: string; token: strin
     }
   };
 
+  const handleSendEmail = async () => {
+    if (!token) {
+      alert(language === 'es' ? 'No hay token de autenticación' : 'No authentication token');
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      const response = await fetch(`/api/user/my-record/send-email?language=${language}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert(language === 'es' ? 'Email enviado exitosamente' : 'Email sent successfully');
+      } else {
+        alert(data.message || (language === 'es' ? 'Error al enviar el email' : 'Error sending email'));
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      alert(language === 'es' ? 'Error al enviar el email. Por favor, intenta de nuevo.' : 'Error sending email. Please try again.');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   return (
     <>
       <div className="bg-white rounded-lg shadow-lg p-6">
@@ -292,6 +324,25 @@ function MedicalRecordCard({ language, token }: { language: string; token: strin
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 {language === 'es' ? 'Descargar PDF' : 'Download PDF'}
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleSendEmail}
+            disabled={sendingEmail || generatingPDF}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+          >
+            {sendingEmail ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                {language === 'es' ? 'Enviando...' : 'Sending...'}
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                {language === 'es' ? 'Enviar Email' : 'Send Email'}
               </>
             )}
           </button>

@@ -81,7 +81,12 @@ export class SystemSettingsModel {
       });
       
       return result;
-    } catch (error) {
+    } catch (error: any) {
+      // Si la tabla no existe, simplemente retornar objeto vacío (se usará fallback de variables de entorno)
+      if (error?.code === 'ER_NO_SUCH_TABLE') {
+        return {};
+      }
+      // Para otros errores, loguear pero no fallar
       console.error('Error al obtener todas las configuraciones:', error);
       return {};
     }
@@ -100,13 +105,14 @@ export class SystemSettingsModel {
   }> {
     const settings = await this.getAllSettings();
     
+    // Usar variables de entorno como fallback si no hay configuración en BD
     return {
-      host: settings.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(settings.SMTP_PORT || '587'),
-      user: settings.SMTP_USER || '',
-      password: settings.SMTP_PASSWORD || '',
+      host: settings.SMTP_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(settings.SMTP_PORT || process.env.SMTP_PORT || '587'),
+      user: settings.SMTP_USER || process.env.SMTP_USER || '',
+      password: settings.SMTP_PASSWORD || process.env.SMTP_PASSWORD || '',
       fromName: 'Zplendid', // Nombre fijo del sistema
-      fromEmail: settings.SMTP_USER || '' // Usa el mismo email del usuario SMTP
+      fromEmail: settings.SMTP_USER || process.env.SMTP_USER || '' // Usa el mismo email del usuario SMTP
     };
   }
 
