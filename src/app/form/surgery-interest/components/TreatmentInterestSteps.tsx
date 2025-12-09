@@ -12,14 +12,14 @@ interface SurgeryInterestData {
   consultedAboutWeightLoss: string;
   consultationType: string;
   consultationDate: string;
-  
+
   // Surgery Interest
   surgeryInterest: string;
   firstTimeBariatricName: string;
   revisionalBariatricName: string;
   primaryPlasticName: string;
   postBariatricPlasticName: string;
-  
+
   // Weight History
   highestWeight: string;
   highestWeightDate: string;
@@ -33,13 +33,13 @@ interface SurgeryInterestData {
   weightRegained: string;
   weightRegainedDate: string;
   weightRegainTime: string;
-  
+
   // Surgery Details
   surgeryReadiness: string;
   surgeonPreference: string;
   additionalProcedures: string;
   estimatedSurgeryDate: string;
-  
+
   // GERD Information
   gerdHeartburn: string;
   gerdRegurgitation: string;
@@ -48,9 +48,15 @@ interface SurgeryInterestData {
   gerdNausea: string;
   gerdSleepDisturbance: string;
   gerdEndoscopy: string;
+  gerdEndoscopyDate: string;
+  gerdEndoscopyFindings: string;
   gerdPhStudy: string;
+  gerdPhStudyDate: string;
+  gerdPhStudyFindings: string;
   gerdManometry: string;
-  
+  gerdManometryDate: string;
+  gerdManometryFindings: string;
+
   // PGWBI Questions
   pgwbi1Anxious: string;
   pgwbi2Depressed: string;
@@ -104,7 +110,7 @@ export default function TreatmentInterestSteps({
             <h3 className="text-lg font-semibold text-[#212e5c] mb-4">
               {language === 'es' ? 'Tratamientos Previos' : 'Previous Treatments'}
             </h3>
-            
+
             <SelectField
               label={language === 'es' ? '¿Ha tenido cirugía de pérdida de peso anteriormente?' : 'Have you had weight loss surgery before?'}
               name="previousWeightLossSurgery"
@@ -170,7 +176,7 @@ export default function TreatmentInterestSteps({
             <h3 className="text-lg font-semibold text-[#212e5c] mb-4">
               {language === 'es' ? 'Interés en Tratamiento' : 'Treatment Interest'}
             </h3>
-            
+
             <SelectField
               label={language === 'es' ? '¿Qué tipo de procedimiento le interesa?' : 'What type of procedure interests you?'}
               name="surgeryInterest"
@@ -185,43 +191,68 @@ export default function TreatmentInterestSteps({
             </SelectField>
 
             {formData.surgeryInterest === 'first_time_bariatric' && (
-              <FormField
+              <SelectField
                 label={language === 'es' ? 'Procedimiento Específico' : 'Specific Procedure'}
                 name="firstTimeBariatricName"
                 value={formData.firstTimeBariatricName}
                 onChange={handleChange}
-                placeholder={language === 'es' ? 'Ej: Gastric Sleeve, Gastric Bypass' : 'Ex: Gastric Sleeve, Gastric Bypass'}
-              />
+              >
+                <option value="">{language === 'es' ? 'Seleccione...' : 'Select...'}</option>
+                <option value="gastric_sleeve">{language === 'es' ? 'Manga Gástrica (Gastric Sleeve)' : 'Gastric Sleeve'}</option>
+                <option value="gastric_bypass">{language === 'es' ? 'Bypass Gástrico (Gastric Bypass)' : 'Gastric Bypass'}</option>
+                <option value="sadi_sasi">SADI-S/SASI-S</option>
+              </SelectField>
             )}
 
             {formData.surgeryInterest === 'revisional_bariatric' && (
-              <FormField
+              <SelectField
                 label={language === 'es' ? 'Procedimiento de Revisión' : 'Revision Procedure'}
                 name="revisionalBariatricName"
                 value={formData.revisionalBariatricName}
                 onChange={handleChange}
-                placeholder={language === 'es' ? 'Describa el procedimiento de revisión' : 'Describe the revision procedure'}
-              />
+              >
+                <option value="">{language === 'es' ? 'Seleccione...' : 'Select...'}</option>
+                <option value="band_to_sleeve">{language === 'es' ? 'Banda a Manga (Band to Sleeve)' : 'Band to Sleeve'}</option>
+                <option value="band_to_bypass">{language === 'es' ? 'Banda a Bypass (Band to Bypass)' : 'Band to Bypass'}</option>
+                <option value="sleeve_to_bypass">{language === 'es' ? 'Manga a Bypass (Sleeve to Bypass)' : 'Sleeve to Bypass'}</option>
+                <option value="bypass_revision">{language === 'es' ? 'Revisión de Bypass (Bypass Revision)' : 'Bypass Revision'}</option>
+              </SelectField>
             )}
 
             {formData.surgeryInterest === 'primary_plastic' && (
-              <FormField
-                label={language === 'es' ? 'Procedimiento Plástico' : 'Plastic Procedure'}
+              <SelectField
+                label={language === 'es' ? 'Procedimientos Plásticos' : 'Plastic Procedures'}
                 name="primaryPlasticName"
                 value={formData.primaryPlasticName}
                 onChange={handleChange}
-                placeholder={language === 'es' ? 'Ej: Liposucción, Abdominoplastia' : 'Ex: Liposuction, Abdominoplasty'}
-              />
+              >
+                <option value="">{language === 'es' ? 'Seleccione...' : 'Select...'}</option>
+                <option value="lipo_bbl">{language === 'es' ? 'Lipo BBL' : 'Lipo BBL'}</option>
+                <option value="abdominoplasty">{language === 'es' ? 'Abdominoplastia' : 'Abdominoplasty'}</option>
+                <option value="breast_augmentation">{language === 'es' ? 'Aumento de Senos' : 'Breast Augmentation'}</option>
+                <option value="brachioplasty">{language === 'es' ? 'Braquioplastia' : 'Brachioplasty'}</option>
+                <option value="torsoplasty">{language === 'es' ? 'Torsoplastia' : 'Torsoplasty'}</option>
+                <option value="thigh_lift">{language === 'es' ? 'Lifting de Muslos' : 'Thigh Lift'}</option>
+                <option value="other">{language === 'es' ? 'Otro' : 'Other'}</option>
+              </SelectField>
             )}
 
             {formData.surgeryInterest === 'post_bariatric_plastic' && (
-              <FormField
-                label={language === 'es' ? 'Procedimiento Post-Bariátrico' : 'Post-Bariatric Procedure'}
+              <SelectField
+                label={language === 'es' ? 'Procedimientos Post-Bariátricos' : 'Post-Bariatric Procedures'}
                 name="postBariatricPlasticName"
                 value={formData.postBariatricPlasticName}
                 onChange={handleChange}
-                placeholder={language === 'es' ? 'Describa el procedimiento' : 'Describe the procedure'}
-              />
+              >
+                <option value="">{language === 'es' ? 'Seleccione...' : 'Select...'}</option>
+                <option value="lipo_bbl">{language === 'es' ? 'Lipo BBL' : 'Lipo BBL'}</option>
+                <option value="abdominoplasty">{language === 'es' ? 'Abdominoplastia' : 'Abdominoplasty'}</option>
+                <option value="breast_augmentation">{language === 'es' ? 'Aumento de Senos' : 'Breast Augmentation'}</option>
+                <option value="brachioplasty">{language === 'es' ? 'Braquioplastia' : 'Brachioplasty'}</option>
+                <option value="torsoplasty">{language === 'es' ? 'Torsoplastia' : 'Torsoplasty'}</option>
+                <option value="thigh_lift">{language === 'es' ? 'Lifting de Muslos' : 'Thigh Lift'}</option>
+                <option value="other">{language === 'es' ? 'Otro' : 'Other'}</option>
+              </SelectField>
             )}
 
             <SelectField
@@ -241,82 +272,159 @@ export default function TreatmentInterestSteps({
         );
 
       case 3:
+        // Weight History - Conditional based on surgery type
+        // Skip this step entirely for primary_plastic (handled in navigation)
+        const isRevisionalOrPostBariatric =
+          formData.surgeryInterest === 'revisional_bariatric' ||
+          formData.surgeryInterest === 'post_bariatric_plastic';
+
         return (
           <div className="space-y-6">
             <h3 className="text-lg font-semibold text-[#212e5c] mb-4">
               {language === 'es' ? 'Historial de Peso' : 'Weight History'}
             </h3>
-            
-            <FormField
-              label={language === 'es' ? 'Peso Más Alto (kg)' : 'Highest Weight (kg)'}
-              name="highestWeight"
-              value={formData.highestWeight}
-              onChange={handleChange}
-              type="number"
-              placeholder={language === 'es' ? 'Ej: 120' : 'Ex: 120'}
-            />
 
-            <FormField
-              label={language === 'es' ? 'Fecha del Peso Más Alto' : 'Highest Weight Date'}
-              name="highestWeightDate"
-              value={formData.highestWeightDate}
-              onChange={handleChange}
-              type="date"
-            />
+            {/* Highest Weight - Always shown */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                label={language === 'es' ? 'Peso Más Alto (kg)' : 'Highest Weight (kg)'}
+                name="highestWeight"
+                value={formData.highestWeight}
+                onChange={handleChange}
+                type="number"
+                placeholder={language === 'es' ? 'Ej: 120' : 'Ex: 120'}
+              />
 
-            <FormField
-              label={language === 'es' ? 'Peso Actual (kg)' : 'Current Weight (kg)'}
-              name="currentWeight"
-              value={formData.currentWeight}
-              onChange={handleChange}
-              type="number"
-              placeholder={language === 'es' ? 'Ej: 90' : 'Ex: 90'}
-            />
+              <FormField
+                label={language === 'es' ? 'Fecha del Peso Más Alto' : 'Highest Weight Date'}
+                name="highestWeightDate"
+                value={formData.highestWeightDate}
+                onChange={handleChange}
+                type="date"
+              />
+            </div>
 
-            <FormField
-              label={language === 'es' ? 'Peso Meta (kg)' : 'Goal Weight (kg)'}
-              name="goalWeight"
-              value={formData.goalWeight}
-              onChange={handleChange}
-              type="number"
-              placeholder={language === 'es' ? 'Ej: 70' : 'Ex: 70'}
-            />
-
-            <SelectField
-              label={language === 'es' ? '¿Ha recuperado peso anteriormente?' : 'Have you regained weight before?'}
-              name="weightRegained"
-              value={formData.weightRegained}
-              onChange={handleChange}
-            >
-              <option value="">{language === 'es' ? 'Seleccionar respuesta' : 'Select response'}</option>
-              <option value="no">{language === 'es' ? 'No' : 'No'}</option>
-              <option value="yes">{language === 'es' ? 'Sí' : 'Yes'}</option>
-            </SelectField>
-
-            {formData.weightRegained === 'yes' && (
-              <>
+            {/* Surgery Weight - Only for Revisional/Post-Bariatric */}
+            {isRevisionalOrPostBariatric && (
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <FormField
-                  label={language === 'es' ? 'Cuánto peso recuperó (kg)' : 'How much weight did you regain (kg)'}
-                  name="weightRegainedDate"
-                  value={formData.weightRegainedDate}
+                  label={language === 'es' ? 'Peso al Momento de la Cirugía Previa (kg)' : 'Surgery Weight (kg) - Weight at time of previous surgery'}
+                  name="surgeryWeight"
+                  value={formData.surgeryWeight}
                   onChange={handleChange}
                   type="number"
-                  placeholder={language === 'es' ? 'Ej: 15' : 'Ex: 15'}
+                  placeholder={language === 'es' ? 'Peso durante cirugía anterior' : 'Weight during previous surgery'}
                 />
-                
+              </div>
+            )}
+
+            {/* Lowest Weight - Always shown */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                label={language === 'es' ? 'Peso Más Bajo (kg)' : 'Lowest Weight (kg)'}
+                name="lowestWeight"
+                value={formData.lowestWeight}
+                onChange={handleChange}
+                type="number"
+                placeholder={language === 'es' ? 'Ej: 70' : 'Ex: 70'}
+              />
+
+              <FormField
+                label={language === 'es' ? 'Fecha del Peso Más Bajo' : 'Lowest Weight Date'}
+                name="lowestWeightDate"
+                value={formData.lowestWeightDate}
+                onChange={handleChange}
+                type="date"
+              />
+            </div>
+
+            {/* Current Weight - Always shown */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                label={language === 'es' ? 'Peso Actual (kg)' : 'Current Weight (kg)'}
+                name="currentWeight"
+                value={formData.currentWeight}
+                onChange={handleChange}
+                type="number"
+                placeholder={language === 'es' ? 'Ej: 90' : 'Ex: 90'}
+              />
+
+              <FormField
+                label={language === 'es' ? '¿Por cuánto tiempo ha mantenido su peso actual?' : 'How long have you maintained your current weight?'}
+                name="currentWeightDuration"
+                value={formData.currentWeightDuration}
+                onChange={handleChange}
+                placeholder={language === 'es' ? 'Ej: 6 meses, 2 años' : 'Ex: 6 months, 2 years'}
+              />
+            </div>
+
+            {/* Goal Weight - Always shown */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                label={language === 'es' ? 'Peso Meta (kg)' : 'Goal Weight (kg)'}
+                name="goalWeight"
+                value={formData.goalWeight}
+                onChange={handleChange}
+                type="number"
+                placeholder={language === 'es' ? 'Ej: 70' : 'Ex: 70'}
+              />
+
+              {/* Goal Weight Date - Only for Revisional/Post-Bariatric */}
+              {isRevisionalOrPostBariatric && (
+                <FormField
+                  label={language === 'es' ? '¿Cuándo espera alcanzar su peso meta?' : 'When do you aim to reach your goal weight?'}
+                  name="goalWeightDate"
+                  value={formData.goalWeightDate}
+                  onChange={handleChange}
+                  placeholder={language === 'es' ? 'Ej: En 6 meses, 1 año' : 'Ex: In 6 months, 1 year'}
+                />
+              )}
+            </div>
+
+            {/* Weight Regained - Only for Revisional/Post-Bariatric */}
+            {isRevisionalOrPostBariatric && (
+              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 space-y-4">
+                <h4 className="font-medium text-[#212e5c]">
+                  {language === 'es' ? 'Recuperación de Peso' : 'Weight Regained'}
+                </h4>
+
                 <SelectField
-                  label={language === 'es' ? 'En cuánto tiempo recuperó el peso' : 'How long did it take to regain weight'}
-                  name="weightRegainTime"
-                  value={formData.weightRegainTime}
+                  label={language === 'es' ? '¿Ha recuperado peso después de su cirugía anterior?' : 'Have you regained weight after your previous surgery?'}
+                  name="weightRegained"
+                  value={formData.weightRegained}
                   onChange={handleChange}
                 >
-                  <option value="">{language === 'es' ? 'Seleccione...' : 'Select...'}</option>
-                  <option value="less_than_6_months">{language === 'es' ? 'Menos de 6 meses' : 'Less than 6 months'}</option>
-                  <option value="6-12_months">{language === 'es' ? '6-12 meses' : '6-12 months'}</option>
-                  <option value="1-2_years">{language === 'es' ? '1-2 años' : '1-2 years'}</option>
-                  <option value="more_than_2_years">{language === 'es' ? 'Más de 2 años' : 'More than 2 years'}</option>
+                  <option value="">{language === 'es' ? 'Seleccionar respuesta' : 'Select response'}</option>
+                  <option value="no">{language === 'es' ? 'No' : 'No'}</option>
+                  <option value="yes">{language === 'es' ? 'Sí' : 'Yes'}</option>
                 </SelectField>
-              </>
+
+                {formData.weightRegained === 'yes' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <FormField
+                      label={language === 'es' ? 'Cuánto peso recuperó (kg)' : 'How much weight did you regain (kg)'}
+                      name="weightRegainedDate"
+                      value={formData.weightRegainedDate}
+                      onChange={handleChange}
+                      type="number"
+                      placeholder={language === 'es' ? 'Ej: 15' : 'Ex: 15'}
+                    />
+
+                    <SelectField
+                      label={language === 'es' ? 'En cuánto tiempo recuperó el peso' : 'How long did it take to regain weight'}
+                      name="weightRegainTime"
+                      value={formData.weightRegainTime}
+                      onChange={handleChange}
+                    >
+                      <option value="">{language === 'es' ? 'Seleccione...' : 'Select...'}</option>
+                      <option value="less_than_6_months">{language === 'es' ? 'Menos de 6 meses' : 'Less than 6 months'}</option>
+                      <option value="6-12_months">{language === 'es' ? '6-12 meses' : '6-12 months'}</option>
+                      <option value="1-2_years">{language === 'es' ? '1-2 años' : '1-2 years'}</option>
+                      <option value="more_than_2_years">{language === 'es' ? 'Más de 2 años' : 'More than 2 years'}</option>
+                    </SelectField>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         );
@@ -327,9 +435,9 @@ export default function TreatmentInterestSteps({
             <h3 className="text-lg font-semibold text-[#212e5c] mb-4">
               {language === 'es' ? 'Información de GERD' : 'GERD Information'}
             </h3>
-            
+
             <p className="text-sm text-gray-600 mb-4">
-              {language === 'es' 
+              {language === 'es'
                 ? 'Por favor indique con qué frecuencia experimenta los siguientes síntomas (0 = Nunca, 1 = Raramente, 2 = Algunas veces, 3 = Frecuentemente, 4 = Siempre)'
                 : 'Please indicate how often you experience the following symptoms (0 = Never, 1 = Rarely, 2 = Sometimes, 3 = Frequently, 4 = Always)'
               }
@@ -412,6 +520,66 @@ export default function TreatmentInterestSteps({
               <option value="3">3 - {language === 'es' ? 'Frecuentemente' : 'Frequently'}</option>
               <option value="4">4 - {language === 'es' ? 'Siempre' : 'Always'}</option>
             </SelectField>
+            <div className="space-y-4 border-t pt-4 mt-4">
+              <h4 className="font-medium text-[#212e5c]">{language === 'es' ? 'Pruebas Diagnósticas' : 'Diagnostic Tests'}</h4>
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <SelectField
+                  label={language === 'es' ? '¿Se ha realizado una Endoscopia GI Superior?' : 'Have you had an Upper GI Endoscopy?'}
+                  name="gerdEndoscopy"
+                  value={formData.gerdEndoscopy}
+                  onChange={handleChange}
+                >
+                  <option value="">{language === 'es' ? 'Seleccionar...' : 'Select...'}</option>
+                  <option value="no">{language === 'es' ? 'No' : 'No'}</option>
+                  <option value="yes">{language === 'es' ? 'Sí' : 'Yes'}</option>
+                </SelectField>
+                {formData.gerdEndoscopy === 'yes' && (
+                  <div className="mt-3 space-y-3 animate-slideDown pl-4 border-l-2 border-blue-200">
+                    <FormField label={language === 'es' ? 'Fecha' : 'Date'} name="gerdEndoscopyDate" value={formData.gerdEndoscopyDate} onChange={handleChange} type="date" />
+                    <FormField label={language === 'es' ? 'Hallazgos' : 'Findings'} name="gerdEndoscopyFindings" value={formData.gerdEndoscopyFindings} onChange={handleChange} placeholder={language === 'es' ? 'Describa los hallazgos...' : 'Describe findings...'} />
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <SelectField
+                  label={language === 'es' ? '¿Se ha realizado un estudio de pH de 24 horas?' : 'Have you had a 24-hour pH Study?'}
+                  name="gerdPhStudy"
+                  value={formData.gerdPhStudy}
+                  onChange={handleChange}
+                >
+                  <option value="">{language === 'es' ? 'Seleccionar...' : 'Select...'}</option>
+                  <option value="no">{language === 'es' ? 'No' : 'No'}</option>
+                  <option value="yes">{language === 'es' ? 'Sí' : 'Yes'}</option>
+                </SelectField>
+                {formData.gerdPhStudy === 'yes' && (
+                  <div className="mt-3 space-y-3 animate-slideDown pl-4 border-l-2 border-blue-200">
+                    <FormField label={language === 'es' ? 'Fecha' : 'Date'} name="gerdPhStudyDate" value={formData.gerdPhStudyDate} onChange={handleChange} type="date" />
+                    <FormField label={language === 'es' ? 'Hallazgos' : 'Findings'} name="gerdPhStudyFindings" value={formData.gerdPhStudyFindings} onChange={handleChange} placeholder={language === 'es' ? 'Describa los hallazgos...' : 'Describe findings...'} />
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <SelectField
+                  label={language === 'es' ? '¿Se ha realizado una Manometría Esofágica?' : 'Have you had an Esophageal Manometry?'}
+                  name="gerdManometry"
+                  value={formData.gerdManometry}
+                  onChange={handleChange}
+                >
+                  <option value="">{language === 'es' ? 'Seleccionar...' : 'Select...'}</option>
+                  <option value="no">{language === 'es' ? 'No' : 'No'}</option>
+                  <option value="yes">{language === 'es' ? 'Sí' : 'Yes'}</option>
+                </SelectField>
+                {formData.gerdManometry === 'yes' && (
+                  <div className="mt-3 space-y-3 animate-slideDown pl-4 border-l-2 border-blue-200">
+                    <FormField label={language === 'es' ? 'Fecha' : 'Date'} name="gerdManometryDate" value={formData.gerdManometryDate} onChange={handleChange} type="date" />
+                    <FormField label={language === 'es' ? 'Hallazgos' : 'Findings'} name="gerdManometryFindings" value={formData.gerdManometryFindings} onChange={handleChange} placeholder={language === 'es' ? 'Describa los hallazgos...' : 'Describe findings...'} />
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         );
 
@@ -421,9 +589,9 @@ export default function TreatmentInterestSteps({
             <h3 className="text-lg font-semibold text-[#212e5c] mb-4">
               {language === 'es' ? 'Cuestionario de Bienestar Psicológico' : 'Psychological General Well-Being Index'}
             </h3>
-            
+
             <p className="text-sm text-gray-600 mb-4">
-              {language === 'es' 
+              {language === 'es'
                 ? 'Durante las últimas 4 semanas, ¿cómo se ha sentido? (6 = Muy bien, 5 = Bien, 4 = Bastante bien, 3 = Bastante mal, 2 = Mal, 1 = Muy mal, 0 = No sé)'
                 : 'During the past 4 weeks, how have you been feeling? (6 = Very well, 5 = Well, 4 = Fairly well, 3 = Fairly bad, 2 = Bad, 1 = Very bad, 0 = Don\'t know)'
               }
@@ -492,6 +660,41 @@ export default function TreatmentInterestSteps({
               <option value="1">1 - {language === 'es' ? 'Muy mal' : 'Very bad'}</option>
               <option value="0">0 - {language === 'es' ? 'No sé' : 'Don\'t know'}</option>
             </SelectField>
+
+            {/* Questions 5-18 */}
+            {[
+              { key: 'pgwbi5Health', label: 'General Health' },
+              { key: 'pgwbi6Spirits', label: 'Spirits' },
+              { key: 'pgwbi7Worried', label: 'Worried' },
+              { key: 'pgwbi8Energy', label: 'Energy' },
+              { key: 'pgwbi9Mood', label: 'Mood' },
+              { key: 'pgwbi10Tension', label: 'Tension' },
+              { key: 'pgwbi11Happiness', label: 'Happiness' },
+              { key: 'pgwbi12Interest', label: 'Interest in things' },
+              { key: 'pgwbi13Calm', label: 'Calm' },
+              { key: 'pgwbi14Sad', label: 'Sad' },
+              { key: 'pgwbi15Active', label: 'Active' },
+              { key: 'pgwbi16Cheerful', label: 'Cheerful' },
+              { key: 'pgwbi17Tired', label: 'Tired' },
+              { key: 'pgwbi18Pressure', label: 'Pressure' }
+            ].map((item) => (
+              <SelectField
+                key={item.key}
+                label={item.label}
+                name={item.key}
+                value={formData[item.key as keyof SurgeryInterestData]}
+                onChange={handleChange}
+              >
+                <option value="">{language === 'es' ? 'Seleccione...' : 'Select...'}</option>
+                <option value="6">6 - {language === 'es' ? 'Muy bien' : 'Very well'}</option>
+                <option value="5">5 - {language === 'es' ? 'Bien' : 'Well'}</option>
+                <option value="4">4 - {language === 'es' ? 'Bastante bien' : 'Fairly well'}</option>
+                <option value="3">3 - {language === 'es' ? 'Bastante mal' : 'Fairly bad'}</option>
+                <option value="2">2 - {language === 'es' ? 'Mal' : 'Bad'}</option>
+                <option value="1">1 - {language === 'es' ? 'Muy mal' : 'Very bad'}</option>
+                <option value="0">0 - {language === 'es' ? 'No sé' : 'Don\'t know'}</option>
+              </SelectField>
+            ))}
           </div>
         );
 
@@ -513,7 +716,7 @@ export default function TreatmentInterestSteps({
           </span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
-          <div 
+          <div
             className="bg-[#212e5c] h-2 rounded-full transition-all duration-300"
             style={{ width: `${(currentStep / totalSteps) * 100}%` }}
           ></div>
@@ -533,18 +736,18 @@ export default function TreatmentInterestSteps({
           variant="secondary"
           className="px-6 py-3"
         >
-          {currentStep === 1 
+          {currentStep === 1
             ? (language === 'es' ? 'Guardar y Volver' : 'Save and Return')
             : (language === 'es' ? 'Anterior' : 'Previous')
           }
         </Button>
-        
+
         <Button
           type="button"
           onClick={onNext}
           className="px-6 py-3 bg-[#212e5c] text-white hover:bg-[#1a2347]"
         >
-          {currentStep === totalSteps 
+          {currentStep === totalSteps
             ? (language === 'es' ? 'Finalizar' : 'Finish')
             : (language === 'es' ? 'Siguiente' : 'Next')
           }

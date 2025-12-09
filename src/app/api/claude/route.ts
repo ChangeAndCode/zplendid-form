@@ -5,7 +5,7 @@ import { JWTUtils } from '../../../lib/utils/jwt';
 
 interface ClaudeRequest {
   message: string;
-  conversationHistory?: Array<{role: 'user' | 'assistant', content: string}>;
+  conversationHistory?: Array<{ role: 'user' | 'assistant', content: string }>;
   category?: string;
   language?: 'es' | 'en';
   patientId?: string;
@@ -22,7 +22,7 @@ interface ClaudeResponse {
 
 export async function POST(request: NextRequest) {
   const chatSessionService = new ChatSessionService();
-  
+
   try {
     // Obtener token de autenticación para guardado incremental
     const authHeader = request.headers.get('authorization');
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     const token = authHeader ? JWTUtils.extractTokenFromHeader(authHeader) : null;
     console.log('🔍 Token extraído:', token ? 'Sí' : 'No');
     let userId: number | null = null;
-    
+
     if (token) {
       try {
         const decoded = JWTUtils.verifyToken(token);
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     const { message, conversationHistory = [], category, language = 'en', patientId, sessionId }: ClaudeRequest = await request.json();
 
     const API_KEY = process.env.ANTHROPIC_API_KEY;
-    
+
     if (!API_KEY) {
       return NextResponse.json(
         { error: 'Claude API key not configured' },
@@ -58,16 +58,16 @@ export async function POST(request: NextRequest) {
     // Función auxiliar para cargar datos desde MySQL a extractedData
     const loadExtractedDataFromMySQL = async (userId: number | null, patientId: string | undefined): Promise<Record<string, any>> => {
       if (!userId || !patientId) return {};
-      
+
       try {
         const { AdminModel } = await import('../../../lib/models/Admin');
         const patientDetails = await AdminModel.getPatientDetails(patientId);
-        
+
         if (!patientDetails || !patientDetails.chatbotData) return {};
-        
+
         // Convertir datos de las tablas MySQL a formato extractedData
         const extractedData: Record<string, any> = {};
-        
+
         // Combinar todos los datos en un solo objeto
         if (patientDetails.chatbotData.patientInfo) {
           Object.assign(extractedData, patientDetails.chatbotData.patientInfo);
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
         if (patientDetails.chatbotData.familyHistory) {
           Object.assign(extractedData, patientDetails.chatbotData.familyHistory);
         }
-        
+
         return extractedData;
       } catch (error) {
         console.warn('Error al cargar datos desde MySQL:', error);
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     if (message === 'start') {
       // Crear nueva sesión (usa 'guest' si no hay patientId) y responder sin invocar a Claude
       currentSession = await chatSessionService.createSession(patientId || 'guest');
-      
+
       // Cargar datos existentes desde MySQL si hay userId y patientId
       if (userId && patientId) {
         const existingData = await loadExtractedDataFromMySQL(userId, patientId);
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
           currentSession.extractedData = existingData;
         }
       }
-      
+
       return NextResponse.json({
         success: true,
         session: currentSession
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
-      
+
       // Si la sesión no tiene extractedData o está vacío, cargar desde MySQL
       if ((!currentSession.extractedData || Object.keys(currentSession.extractedData).length === 0) && userId && currentSession.patientId && currentSession.patientId !== 'guest') {
         const existingData = await loadExtractedDataFromMySQL(userId, currentSession.patientId);
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     } else if (patientId) {
       // Si hay patientId pero no sessionId, crear una nueva sesión
       currentSession = await chatSessionService.createSession(patientId);
-      
+
       // Cargar datos existentes desde MySQL
       if (userId) {
         const existingData = await loadExtractedDataFromMySQL(userId, patientId);
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     // Construir el prompt base
     const currentCategory = currentSession.currentCategory || category || 'personal';
     const basePrompt = buildBasePrompt(currentCategory, language);
-    
+
     // SIEMPRE consultar MySQL para obtener la información más actualizada
     // Esta es la fuente de verdad, ya que de aquí se genera el PDF
     let extractedData: Record<string, any> = {};
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
       extractedData = updatedSession?.extractedData || currentSession.extractedData || {};
       console.log(`ℹ️ Sesión guest o sin userId, usando datos de sesión: ${Object.keys(extractedData).length} campos`);
     }
-    
+
     // Construir lista de campos ya recopilados de forma más legible
     const collectedFields: string[] = [];
     if (extractedData.firstName || extractedData.lastName) collectedFields.push('Información personal básica (nombre, apellido)');
@@ -184,18 +184,18 @@ export async function POST(request: NextRequest) {
     if (extractedData.previousSurgeries) collectedFields.push('Cirugías previas');
     if (extractedData.tobacco || extractedData.alcohol || extractedData.drugs) collectedFields.push('Historial social');
     if (extractedData.heartDisease || extractedData.diabetesMellitus) collectedFields.push('Historial familiar');
-    
+
     const extractedDataText = Object.keys(extractedData).length > 0
       ? `\n\n⚠️ INFORMACIÓN YA RECOPILADA - NO PREGUNTES ESTO DE NUEVO ⚠️\n\nEl paciente ya ha proporcionado la siguiente información:\n${collectedFields.length > 0 ? '- ' + collectedFields.join('\n- ') : 'Ninguna información recopilada aún'}\n\nDatos completos ya recopilados:\n${JSON.stringify(extractedData, null, 2)}\n\nREGLAS CRÍTICAS:\n- NUNCA vuelvas a preguntar sobre información que ya está en la lista anterior\n- NUNCA repitas preguntas que ya has hecho en esta conversación\n- Si un campo ya tiene valor en los datos recopilados, NO lo preguntes de nuevo\n- Revisa los datos recopilados ANTES de hacer cualquier pregunta\n- Solo pregunta sobre información que NO esté en los datos recopilados\n- Continúa sistemáticamente con las siguientes secciones que aún faltan\n\nIMPORTANTE: Si ves que un dato ya está recopilado, simplemente continúa con la siguiente pregunta/sección. NO lo menciones ni lo preguntes de nuevo.`
       : '';
-    
+
     // Construir el historial de conversación desde la sesión
     const sessionMessages = currentSession.messages.map(msg => ({
       role: msg.type === 'user' ? 'user' as const : 'assistant' as const,
       content: msg.content
     }));
-    
-    const messages: Array<{role: 'user' | 'assistant', content: string}> = [
+
+    const messages: Array<{ role: 'user' | 'assistant', content: string }> = [
       {
         role: 'user' as const,
         content: `${basePrompt}${extractedDataText}\n\nUser message: ${message}`
@@ -223,10 +223,10 @@ export async function POST(request: NextRequest) {
 
     if (response.ok) {
       const data = await response.json();
-      
+
       if (data.content && data.content[0] && data.content[0].text) {
         const assistantResponse = data.content[0].text;
-        
+
         // Guardar mensajes en la sesión
         const userMessage = {
           id: Date.now().toString(),
@@ -234,18 +234,18 @@ export async function POST(request: NextRequest) {
           content: message,
           timestamp: new Date()
         };
-        
+
         const assistantMessage = {
           id: (Date.now() + 1).toString(),
           type: 'assistant' as const,
           content: assistantResponse,
           timestamp: new Date()
         };
-        
+
         // Agregar mensajes a la sesión
         await chatSessionService.addMessage(currentSession.id, userMessage);
         await chatSessionService.addMessage(currentSession.id, assistantMessage);
-        
+
         // Extraer y guardar datos incrementalmente
         let extractedData = {};
         try {
@@ -254,7 +254,7 @@ export async function POST(request: NextRequest) {
             chatSessionService,
             language
           );
-          
+
           // Log de datos extraídos
           if (Object.keys(extractedData).length > 0) {
             console.log('📥 Datos extraídos de la conversación:', Object.keys(extractedData).length, 'campos');
@@ -268,7 +268,7 @@ export async function POST(request: NextRequest) {
           } else {
             console.log('⚠️ No se extrajeron datos de la conversación');
           }
-          
+
           // Actualizar extractedData en la sesión y guardar en MySQL
           if (Object.keys(extractedData).length > 0) {
             // IMPORTANTE: Usar MySQL como fuente de verdad para el merge
@@ -289,24 +289,24 @@ export async function POST(request: NextRequest) {
               const updatedSession = await chatSessionService.getSession(currentSession.id);
               mysqlCurrentData = updatedSession?.extractedData || currentSession.extractedData || {};
             }
-            
+
             // Hacer merge: MySQL (base) + datos extraídos (tienen prioridad)
             // Los datos extraídos sobrescriben los de MySQL si hay conflictos
             const mergedData = { ...mysqlCurrentData, ...extractedData };
-            
+
             // Actualizar también en MongoDB para mantener sincronización
             await chatSessionService.updateExtractedData(currentSession.id, mergedData);
-            
+
             console.log('📦 Datos combinados (merged):', Object.keys(mergedData).length, 'campos totales');
             console.log(`   - De MySQL: ${Object.keys(mysqlCurrentData).length} campos`);
             console.log(`   - Extraídos ahora: ${Object.keys(extractedData).length} campos`);
-            
+
             // Guardar en MySQL si tenemos userId
             if (userId) {
               try {
                 console.log('💾 Guardando datos en MySQL...');
                 const saveResult = await ChatbotDataSaver.saveChatbotData(userId, mergedData);
-                
+
                 if (saveResult.success) {
                   console.log('✅ Datos guardados exitosamente en MySQL');
                   console.log('   Tablas guardadas:', saveResult.savedTables?.join(', ') || 'ninguna');
@@ -342,10 +342,10 @@ export async function POST(request: NextRequest) {
             console.error('   Stack:', extractError.stack);
           }
         }
-        
+
         // Actualizar sesión con mensajes
         const updatedSession = await chatSessionService.getSession(currentSession.id);
-        
+
         return NextResponse.json({
           success: true,
           response: assistantResponse,
@@ -434,7 +434,7 @@ INSTRUCCIONES - TONO CONVERSACIONAL:
 - Cuando transiciones a una nueva sección, usa un puente breve como "Ahora pasemos a [siguiente tema]..." o "Gracias, ahora me gustaría preguntarte sobre [siguiente tema]..." y continúa con la siguiente pregunta
 - Siempre avanza sistemáticamente. Si ya has recopilado información, continúa con la siguiente sección, nunca regreses a secciones anteriores
 - Recuerda: Esta es una conversación amena donde obtienes información completa, NO un cuestionario robotizado`,
-    
+
     en: `You are a medical assistant specialized in collecting patient information for medical questionnaires.
 
 CRITICAL RULES - FOLLOW STRICTLY:
@@ -1165,7 +1165,7 @@ INSTRUCTIONS - CONVERSATIONAL TONE:
   const contextMessage = "IMPORTANT: For the 'personal' category, start with: 'Hi there! I'm your AI medical assistant. To get started, could you share your first and last name and date of birth (MM/DD/YYYY)?'";
 
   const context = (categoryContext[language] as Record<string, string>)[category] || (categoryContext[language] as Record<string, string>).general;
-  
+
   return `${baseInstructions[language]}
 
 CURRENT CONTEXT: ${context}
@@ -1201,7 +1201,7 @@ async function extractStructuredData(
     const conversationText = session.messages
       .map(msg => `${msg.type === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}`)
       .join('\n\n');
-    
+
     // Log para debugging: mostrar cuántos mensajes hay
     const userMessages = session.messages.filter(msg => msg.type === 'user');
     console.log(`📋 Extrayendo datos de conversación: ${session.messages.length} mensajes totales (${userMessages.length} del usuario)`);
@@ -1224,15 +1224,26 @@ INTERÉS QUIRÚRGICO:
 - previousWeightLossSurgery, previousSurgeonName
 - gerdHeartburn, gerdRegurgitation, medications, allergies, previousSurgeries
 
-HISTORIAL MÉDICO:
+HISTORIAL MÉDICO (Condiciones Específicas):
 - sleepApnea, useCpap, diabetes, useInsulin, highBloodPressure
-- heartProblems, respiratoryProblems, medications, allergies
+- HEART: heartAttack, angina, rhythmDisturbance, congestiveHeartFailure, ankleSwelling, varicoseVeins, hemorrhoids, phlebitis, ankleLegUlcers, heartBypass, pacemaker, cloggedHeartArteries, rheumaticFever, heartMurmur, irregularHeartBeat, crampingLegs, otherHeartSymptoms
+- RESPIRATORY: emphysema, bronchitis, pneumonia, chronicCough, shortOfBreath, oxygenSupplement, tuberculosis, pulmonaryEmbolism, hypoventilationSyndrome, coughUpBlood, snoring, lungSurgery, lungCancer
+- URINARY: kidneyStones, frequentUrination, bladderControl, painfulUrination
+- MUSCULAR: neckPain, shoulderPain, wristPain, backPain, hipPain, kneePain, anklePain, footPain, heelPain, plantarFasciitis, carpalTunnel, lupus
+- NEUROLOGICAL: migraineHeadaches, balanceDisturbance, seizureConvulsions, weakness, stroke, alzheimers, pseudoTumorCerebral, multipleSclerosis, frequencySevereHeadaches, knockedUnconscious
+- BLOOD: anemiaIronDeficient, anemiaVitaminB12Deficient, lowPlatelets, lymphoma, swollenLymphNodes, superficialBloodClot, deepBloodClot, bloodClotLungs, bleedingDisorder
+- ENDOCRINE: hypothyroid, hyperthyroid, goiter, parathyroid, elevatedCholesterol, elevatedTriglycerides, lowBloodSugar, prediabetes, gout, endocrineGlandTumor, cancerEndocrineGland, highCalciumLevel, abnormalFacialHair
+- GASTROINTESTINAL: heartburn, hiatalHernia, ulcers, diarrhea, bloodInStool, changeInBowelHabit, constipation, irritableBowel, colitis, crohns, fissure, rectalBleeding, blackTarryStools, polyps
+- HEAD & NECK: wearGlasses, cataracts, glaucoma, wearContacts, hardOfHearing, wearHearingAid, dizziness, faintingSpells, difficultySwallowing, wearDentures, sinusProblems, lumpsInNeck, hoarseness, thyroidProblems
+- SKIN: rashes, keloids, poorWoundHealing, frequentSkinInfections
+- CONSTITUTIONAL: fevers, nightSweats, weightLoss, chronicFatigue
+
+HISTORIAL SOCIAL Y OTROS:
 - tobacco, alcohol, drugs, depression, anxiety
 - previousSurgeries, surgicalComplications, pregnancy
-- hepatitis, hepatitisType, hiv
-
-HISTORIAL FAMILIAR:
-- heartDisease, diabetesMellitus, highBloodPressure, cancer`
+- hepatitis, hepatitisType, hiv, refuseBlood
+- marijuana, aspirin, hormones
+- FAMILY HISTORY: heartDisease, diabetesMellitus, highBloodPressure, cancer`
 
       : `EXPECTED FIELDS (use these exact names if present in the conversation):
 
@@ -1250,17 +1261,28 @@ SURGERY INTEREST:
 - previousWeightLossSurgery, previousSurgeonName
 - gerdHeartburn, gerdRegurgitation, medications, allergies, previousSurgeries
 
-MEDICAL HISTORY:
+MEDICAL HISTORY (Specific Conditions):
 - sleepApnea, useCpap, diabetes, useInsulin, highBloodPressure
-- heartProblems, respiratoryProblems, medications, allergies
+- HEART: heartAttack, angina, rhythmDisturbance, congestiveHeartFailure, ankleSwelling, varicoseVeins, hemorrhoids, phlebitis, ankleLegUlcers, heartBypass, pacemaker, cloggedHeartArteries, rheumaticFever, heartMurmur, irregularHeartBeat, crampingLegs, otherHeartSymptoms
+- RESPIRATORY: emphysema, bronchitis, pneumonia, chronicCough, shortOfBreath, oxygenSupplement, tuberculosis, pulmonaryEmbolism, hypoventilationSyndrome, coughUpBlood, snoring, lungSurgery, lungCancer
+- URINARY: kidneyStones, frequentUrination, bladderControl, painfulUrination
+- MUSCULAR: neckPain, shoulderPain, wristPain, backPain, hipPain, kneePain, anklePain, footPain, heelPain, plantarFasciitis, carpalTunnel, lupus
+- NEUROLOGICAL: migraineHeadaches, balanceDisturbance, seizureConvulsions, weakness, stroke, alzheimers, pseudoTumorCerebral, multipleSclerosis, frequencySevereHeadaches, knockedUnconscious
+- BLOOD: anemiaIronDeficient, anemiaVitaminB12Deficient, lowPlatelets, lymphoma, swollenLymphNodes, superficialBloodClot, deepBloodClot, bloodClotLungs, bleedingDisorder
+- ENDOCRINE: hypothyroid, hyperthyroid, goiter, parathyroid, elevatedCholesterol, elevatedTriglycerides, lowBloodSugar, prediabetes, gout, endocrineGlandTumor, cancerEndocrineGland, highCalciumLevel, abnormalFacialHair
+- GASTROINTESTINAL: heartburn, hiatalHernia, ulcers, diarrhea, bloodInStool, changeInBowelHabit, constipation, irritableBowel, colitis, crohns, fissure, rectalBleeding, blackTarryStools, polyps
+- HEAD & NECK: wearGlasses, cataracts, glaucoma, wearContacts, hardOfHearing, wearHearingAid, dizziness, faintingSpells, difficultySwallowing, wearDentures, sinusProblems, lumpsInNeck, hoarseness, thyroidProblems
+- SKIN: rashes, keloids, poorWoundHealing, frequentSkinInfections
+- CONSTITUTIONAL: fevers, nightSweats, weightLoss, chronicFatigue
+
+SOCIAL HISTORY & OTHERS:
 - tobacco, alcohol, drugs, depression, anxiety
 - previousSurgeries, surgicalComplications, pregnancy
-- hepatitis, hepatitisType, hiv
+- hepatitis, hepatitisType, hiv, refuseBlood
+- marijuana, aspirin, hormones
+- FAMILY HISTORY: heartDisease, diabetesMellitus, highBloodPressure, cancer`;
 
-FAMILY HISTORY:
-- heartDisease, diabetesMellitus, highBloodPressure, cancer`;
-
-    const extractionPrompt = language === 'es' 
+    const extractionPrompt = language === 'es'
       ? `Analiza la siguiente conversación médica COMPLETA y extrae TODOS los datos estructurados que el paciente ha proporcionado en TODA la conversación.
 
 REGLAS CRÍTICAS DE EXTRACCIÓN:
@@ -1337,20 +1359,20 @@ FINAL INSTRUCTION: Review EVERY patient message in the conversation and extract 
 
     if (response.ok) {
       const data = await response.json();
-      
+
       if (data.content && data.content[0] && data.content[0].text) {
         const jsonText = data.content[0].text.trim();
-        
+
         // Intentar parsear el JSON (puede venir con markdown code blocks)
         let jsonData: any = {};
-        
+
         try {
           // Remover markdown code blocks si existen
           const cleanedText = jsonText
             .replace(/```json\n?/g, '')
             .replace(/```\n?/g, '')
             .trim();
-          
+
           jsonData = JSON.parse(cleanedText);
         } catch (parseError) {
           // Si falla el parseo, intentar extraer JSON del texto

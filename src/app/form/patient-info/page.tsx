@@ -111,7 +111,7 @@ export default function PatientInfoForm() {
   // Auto-guardar
   useEffect(() => {
     if (!patientId) return;
-    
+
     try {
       const storageKey = getFormStorageKey('patient_info', patientId);
       localStorage.setItem(storageKey, JSON.stringify(formData));
@@ -142,7 +142,7 @@ export default function PatientInfoForm() {
         const feet = name === 'heightFeet' ? parseFloat(value) : parseFloat(formData.heightFeet);
         const inches = name === 'heightInches' ? parseFloat(value) : parseFloat(formData.heightInches);
         const weight = name === 'weightLbs' ? parseFloat(value) : parseFloat(formData.weightLbs);
-        
+
         if (feet && weight) {
           const totalInches = (feet * 12) + (inches || 0);
           const bmi = (weight / (totalInches * totalInches)) * 703;
@@ -156,7 +156,7 @@ export default function PatientInfoForm() {
       setTimeout(() => {
         const heightCm = name === 'heightCm' ? parseFloat(value) : parseFloat(formData.heightCm);
         const weightKg = name === 'weightKg' ? parseFloat(value) : parseFloat(formData.weightKg);
-        
+
         if (heightCm && weightKg) {
           const heightM = heightCm / 100;
           const bmi = weightKg / (heightM * heightM);
@@ -182,13 +182,13 @@ export default function PatientInfoForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!isAuthenticated) {
       alert(language === 'es' ? 'No estás autenticado' : 'You are not authenticated');
       router.push('/');
       return;
     }
-    
+
     try {
       const token = localStorage.getItem('token');
 
@@ -205,7 +205,8 @@ export default function PatientInfoForm() {
 
       if (result.success) {
         alert(language === 'es' ? 'Formulario guardado correctamente' : 'Form saved successfully');
-        router.push('/landing');
+        // Navigate to next module (Surgery Interest - Module 2)
+        router.push('/form/surgery-interest');
       } else {
         alert(language === 'es' ? 'Error al guardar el formulario' : 'Error saving form');
       }
@@ -243,7 +244,7 @@ export default function PatientInfoForm() {
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
-              <StepNumber 
+              <StepNumber
                 stepNumber={1}
                 totalSteps={4}
                 isActive={true}
@@ -453,7 +454,7 @@ export default function PatientInfoForm() {
             <h2 className="text-xl font-semibold text-[#212e5c] mb-4">
               {t('section.bmi')}
             </h2>
-            
+
             <div className="space-y-4">
               <SelectField
                 label={t('field.measurementSystem')}
@@ -533,7 +534,7 @@ export default function PatientInfoForm() {
             <h2 className="text-xl font-semibold text-[#212e5c] mb-4">
               {language === 'es' ? 'Referencia' : 'Referral'}
             </h2>
-            
+
             <div className="space-y-4">
               <SelectField
                 label={language === 'es' ? '¿Cómo nos conoció?' : 'How did you hear about us?'}
@@ -565,7 +566,7 @@ export default function PatientInfoForm() {
             <h2 className="text-xl font-semibold text-[#212e5c] mb-4">
               {language === 'es' ? 'Información de Seguros' : 'Insurance Information'}
             </h2>
-            
+
             <div className="space-y-4">
               <SelectField
                 label={language === 'es' ? '¿Tiene seguro médico?' : 'Do you have medical insurance?'}
@@ -611,7 +612,7 @@ export default function PatientInfoForm() {
             <h2 className="text-xl font-semibold text-[#212e5c] mb-4">
               {language === 'es' ? 'Información Adicional' : 'Additional Information'}
             </h2>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

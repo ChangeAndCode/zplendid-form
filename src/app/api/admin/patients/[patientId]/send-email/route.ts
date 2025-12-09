@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AdminModel } from '../../../../../../../lib/models/Admin';
-import { JWTUtils } from '../../../../../../../lib/utils/jwt';
-import { generatePatientPDF } from '../../../../../../../lib/utils/patientPdfGenerator';
-import { EmailService } from '../../../../../../../lib/utils/email';
+import { AdminModel } from '../../../../../../lib/models/Admin';
+import { JWTUtils } from '../../../../../../lib/utils/jwt';
+import { generatePatientPDF } from '../../../../../../lib/utils/patientPdfGenerator';
+import { EmailService } from '../../../../../../lib/utils/email';
 
 export async function POST(
   request: NextRequest,
@@ -21,7 +21,7 @@ export async function POST(
     }
 
     const decoded = JWTUtils.verifyToken(token);
-    
+
     // Verificar que sea administrador o doctor
     if (decoded.role !== 'admin' && decoded.role !== 'doctor') {
       return NextResponse.json(
@@ -103,8 +103,8 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: language === 'es' 
-        ? 'Email enviado exitosamente' 
+      message: language === 'es'
+        ? 'Email enviado exitosamente'
         : 'Email sent successfully'
     });
 

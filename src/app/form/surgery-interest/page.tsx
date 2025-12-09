@@ -15,14 +15,14 @@ interface SurgeryInterestData {
   consultedAboutWeightLoss: string;
   consultationType: string;
   consultationDate: string;
-  
+
   // Surgery Interest
   surgeryInterest: string;
   firstTimeBariatricName: string;
   revisionalBariatricName: string;
   primaryPlasticName: string;
   postBariatricPlasticName: string;
-  
+
   // Weight History
   highestWeight: string;
   highestWeightDate: string;
@@ -36,13 +36,13 @@ interface SurgeryInterestData {
   weightRegained: string;
   weightRegainedDate: string;
   weightRegainTime: string;
-  
+
   // Surgery Details
   surgeryReadiness: string;
   surgeonPreference: string;
   additionalProcedures: string;
   estimatedSurgeryDate: string;
-  
+
   // GERD Information
   gerdHeartburn: string;
   gerdRegurgitation: string;
@@ -51,9 +51,15 @@ interface SurgeryInterestData {
   gerdNausea: string;
   gerdSleepDisturbance: string;
   gerdEndoscopy: string;
+  gerdEndoscopyDate: string;
+  gerdEndoscopyFindings: string;
   gerdPhStudy: string;
+  gerdPhStudyDate: string;
+  gerdPhStudyFindings: string;
   gerdManometry: string;
-  
+  gerdManometryDate: string;
+  gerdManometryFindings: string;
+
   // PGWBI Questions
   pgwbi1Anxious: string;
   pgwbi2Depressed: string;
@@ -115,8 +121,14 @@ export default function SurgeryInterestForm() {
     gerdNausea: '',
     gerdSleepDisturbance: '',
     gerdEndoscopy: '',
+    gerdEndoscopyDate: '',
+    gerdEndoscopyFindings: '',
     gerdPhStudy: '',
+    gerdPhStudyDate: '',
+    gerdPhStudyFindings: '',
     gerdManometry: '',
+    gerdManometryDate: '',
+    gerdManometryFindings: '',
     pgwbi1Anxious: '',
     pgwbi2Depressed: '',
     pgwbi3SelfControl: '',
@@ -193,13 +205,13 @@ export default function SurgeryInterestForm() {
   const handleSave = async () => {
     try {
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         alert(language === 'es' ? 'No estás autenticado' : 'You are not authenticated');
         router.push('/');
         return;
       }
-      
+
       const response = await fetch('/api/forms/surgery-interest', {
         method: 'POST',
         headers: {
@@ -226,19 +238,28 @@ export default function SurgeryInterestForm() {
   };
 
   const handleNext = async () => {
-    if (currentStep < 5) {
+    // Special handling for step navigation based on surgery type
+    if (currentStep === 2 && formData.surgeryInterest === 'primary_plastic') {
+      // Skip Weight History (Step 3) for Primary Plastic
+      setCurrentStep(4);
+    } else if (currentStep < 5) {
       setCurrentStep(prev => prev + 1);
     } else {
       // Envío final del formulario
       const saved = await handleSave();
       if (saved) {
-        router.push('/landing');
+        // Navigate to next module (Medical History - Module 3)
+        router.push('/form/medical-history');
       }
     }
   };
 
   const handlePrevious = async () => {
-    if (currentStep > 1) {
+    // Special handling for step navigation based on surgery type
+    if (currentStep === 4 && formData.surgeryInterest === 'primary_plastic') {
+      // Skip Weight History (Step 3) for Primary Plastic when going back
+      setCurrentStep(2);
+    } else if (currentStep > 1) {
       setCurrentStep(prev => prev - 1);
     } else {
       // Si estamos en el paso 1, guardar y salir
@@ -275,7 +296,7 @@ export default function SurgeryInterestForm() {
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
-              <StepNumber 
+              <StepNumber
                 stepNumber={2}
                 totalSteps={4}
                 isActive={true}

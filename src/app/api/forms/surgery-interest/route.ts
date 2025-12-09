@@ -47,8 +47,14 @@ interface SurgeryInterestData {
   gerdNausea: string;
   gerdSleepDisturbance: string;
   gerdEndoscopy: string;
+  gerdEndoscopyDate: string;
+  gerdEndoscopyFindings: string;
   gerdPhStudy: string;
+  gerdPhStudyDate: string;
+  gerdPhStudyFindings: string;
   gerdManometry: string;
+  gerdManometryDate: string;
+  gerdManometryFindings: string;
 
   // PGWBI Questions (1-18)
   pgwbi1Anxious: string;
@@ -179,9 +185,15 @@ export async function GET(request: NextRequest) {
       gerdNausea: mapFormValue(data.gerdNausea),
       gerdSleepDisturbance: mapFormValue(data.gerdSleepDisturbance),
       gerdEndoscopy: mapFormValue(data.gerdEndoscopy),
+      gerdEndoscopyDate: mapFormValue(data.gerdEndoscopyDate),
+      gerdEndoscopyFindings: mapFormValue(data.gerdEndoscopyFindings),
       gerdPhStudy: mapFormValue(data.gerdPhStudy),
+      gerdPhStudyDate: mapFormValue(data.gerdPhStudyDate),
+      gerdPhStudyFindings: mapFormValue(data.gerdPhStudyFindings),
       gerdManometry: mapFormValue(data.gerdManometry),
-      
+      gerdManometryDate: mapFormValue(data.gerdManometryDate),
+      gerdManometryFindings: mapFormValue(data.gerdManometryFindings),
+
       // PGWBI Questions (1-18)
       pgwbi1Anxious: mapFormValue(data.pgwbi1Anxious),
       pgwbi2Depressed: mapFormValue(data.pgwbi2Depressed),
@@ -222,7 +234,7 @@ export async function POST(request: NextRequest) {
   try {
     // Asegurar que todas las columnas necesarias existan (comportamiento tipo Excel)
     await AutoSchema.ensureSurgeryInterestColumns();
-    
+
     const authHeader = request.headers.get('authorization');
     const token = JWTUtils.extractTokenFromHeader(authHeader || undefined);
 
@@ -277,12 +289,12 @@ export async function POST(request: NextRequest) {
 
     // Mapear DINÁMICAMENTE todos los campos del formulario
     const mappedData: Record<string, string> = {};
-    
+
     // Mapear todos los campos del formulario automáticamente
     Object.keys(formData).forEach(key => {
       mappedData[key] = mapStringValue(formData[key as keyof SurgeryInterestData]);
     });
-    
+
     // Verificar si ya existe un registro para este paciente
     const [existing] = await connection.execute(
       'SELECT id FROM surgery_interest WHERE medicalRecordId = ?',

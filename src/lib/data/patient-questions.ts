@@ -536,6 +536,151 @@ export const patientInfoQuestions = [
     },
     fieldName: 'useBipap' as const
   },
+  {
+    id: 'cpapDetails',
+    category: 'medicalHistory',
+    questionText: 'If you use CPAP/BiPAP, how many hours per night?',
+    expectedResponseType: 'text' as const,
+    validationRules: {
+      required: false
+    },
+    fieldName: 'cpapDetails' as const
+  },
+  // HEART PROBLEMS
+  { id: 'heartAttack', category: 'heartConditions', questionText: 'Have you had a heart attack?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'heartAttack' as const },
+  { id: 'angina', category: 'heartConditions', questionText: 'Do you have angina?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'angina' as const },
+  { id: 'rhythmDisturbance', category: 'heartConditions', questionText: 'Do you have rhythm disturbance?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'rhythmDisturbance' as const },
+  { id: 'congestiveHeartFailure', category: 'heartConditions', questionText: 'Do you have congestive heart failure?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'congestiveHeartFailure' as const },
+  { id: 'ankleSwelling', category: 'heartConditions', questionText: 'Do you have ankle swelling?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'ankleSwelling' as const },
+  { id: 'varicoseVeins', category: 'heartConditions', questionText: 'Do you have varicose veins?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'varicoseVeins' as const },
+  { id: 'hemorrhoids', category: 'heartConditions', questionText: 'Do you have hemorrhoids?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'hemorrhoids' as const },
+  { id: 'phlebitis', category: 'heartConditions', questionText: 'Do you have phlebitis?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'phlebitis' as const },
+  { id: 'ankleLegUlcers', category: 'heartConditions', questionText: 'Do you have ankle/leg ulcers?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'ankleLegUlcers' as const },
+  { id: 'heartBypass', category: 'heartConditions', questionText: 'Have you had heart bypass surgery?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'heartBypass' as const },
+  { id: 'pacemaker', category: 'heartConditions', questionText: 'Do you have a pacemaker?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'pacemaker' as const },
+  { id: 'cloggedHeartArteries', category: 'heartConditions', questionText: 'Do you have clogged heart arteries?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'cloggedHeartArteries' as const },
+  { id: 'rheumaticFever', category: 'heartConditions', questionText: 'Have you had rheumatic fever?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'rheumaticFever' as const },
+  { id: 'heartMurmur', category: 'heartConditions', questionText: 'Do you have a heart murmur?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'heartMurmur' as const },
+  { id: 'irregularHeartBeat', category: 'heartConditions', questionText: 'Do you have an irregular heart beat?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'irregularHeartBeat' as const },
+  { id: 'crampingLegs', category: 'heartConditions', questionText: 'Do you have cramping in legs when walking?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'crampingLegs' as const },
+  { id: 'otherHeartSymptoms', category: 'heartConditions', questionText: 'Any other heart symptoms?', expectedResponseType: 'text' as const, validationRules: { required: false }, fieldName: 'otherHeartSymptoms' as const },
+
+  // RESPIRATORY PROBLEMS
+  { id: 'emphysema', category: 'respiratoryConditions', questionText: 'Do you have emphysema?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'emphysema' as const },
+  { id: 'bronchitis', category: 'respiratoryConditions', questionText: 'Do you have bronchitis?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'bronchitis' as const },
+  { id: 'pneumonia', category: 'respiratoryConditions', questionText: 'Have you had pneumonia?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'pneumonia' as const },
+  { id: 'chronicCough', category: 'respiratoryConditions', questionText: 'Do you have a chronic cough?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'chronicCough' as const },
+  { id: 'shortOfBreath', category: 'respiratoryConditions', questionText: 'Are you short of breath?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'shortOfBreath' as const },
+  { id: 'oxygenSupplement', category: 'respiratoryConditions', questionText: 'Do you use oxygen supplement?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'oxygenSupplement' as const },
+  { id: 'tuberculosis', category: 'respiratoryConditions', questionText: 'Have you had tuberculosis?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'tuberculosis' as const },
+  { id: 'pulmonaryEmbolism', category: 'respiratoryConditions', questionText: 'Have you had a pulmonary embolism?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'pulmonaryEmbolism' as const },
+  { id: 'hypoventilationSyndrome', category: 'respiratoryConditions', questionText: 'Do you have hypoventilation syndrome?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'hypoventilationSyndrome' as const },
+  { id: 'coughUpBlood', category: 'respiratoryConditions', questionText: 'Do you cough up blood?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'coughUpBlood' as const },
+  { id: 'snoring', category: 'respiratoryConditions', questionText: 'Do you snore?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'snoring' as const },
+  { id: 'lungSurgery', category: 'respiratoryConditions', questionText: 'Have you had lung surgery?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'lungSurgery' as const },
+  { id: 'lungCancer', category: 'respiratoryConditions', questionText: 'Have you had lung cancer?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'lungCancer' as const },
+
+  // URINARY CONDITIONS
+  { id: 'kidneyStones', category: 'urinaryConditions', questionText: 'Do you have kidney stones?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'kidneyStones' as const },
+  { id: 'frequentUrination', category: 'urinaryConditions', questionText: 'Do you have frequent urination?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'frequentUrination' as const },
+  { id: 'bladderControl', category: 'urinaryConditions', questionText: 'Do you have bladder control problems?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'bladderControl' as const },
+  { id: 'painfulUrination', category: 'urinaryConditions', questionText: 'Do you have painful urination?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'painfulUrination' as const },
+
+  // MUSCULAR CONDITIONS
+  { id: 'neckPain', category: 'muscularConditions', questionText: 'Do you have neck pain?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'neckPain' as const },
+  { id: 'shoulderPain', category: 'muscularConditions', questionText: 'Do you have shoulder pain?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'shoulderPain' as const },
+  { id: 'wristPain', category: 'muscularConditions', questionText: 'Do you have wrist pain?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'wristPain' as const },
+  { id: 'backPain', category: 'muscularConditions', questionText: 'Do you have back pain?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'backPain' as const },
+  { id: 'hipPain', category: 'muscularConditions', questionText: 'Do you have hip pain?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'hipPain' as const },
+  { id: 'kneePain', category: 'muscularConditions', questionText: 'Do you have knee pain?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'kneePain' as const },
+  { id: 'anklePain', category: 'muscularConditions', questionText: 'Do you have ankle pain?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'anklePain' as const },
+  { id: 'footPain', category: 'muscularConditions', questionText: 'Do you have foot pain?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'footPain' as const },
+  { id: 'heelPain', category: 'muscularConditions', questionText: 'Do you have heel pain?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'heelPain' as const },
+  { id: 'plantarFasciitis', category: 'muscularConditions', questionText: 'Do you have plantar fasciitis?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'plantarFasciitis' as const },
+  { id: 'carpalTunnel', category: 'muscularConditions', questionText: 'Do you have carpal tunnel syndrome?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'carpalTunnel' as const },
+  { id: 'lupus', category: 'muscularConditions', questionText: 'Do you have lupus?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'lupus' as const },
+
+  // NEUROLOGICAL CONDITIONS
+  { id: 'migraineHeadaches', category: 'neurologicalConditions', questionText: 'Do you have migraine headaches?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'migraineHeadaches' as const },
+  { id: 'balanceDisturbance', category: 'neurologicalConditions', questionText: 'Do you have balance disturbance?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'balanceDisturbance' as const },
+  { id: 'seizureConvulsions', category: 'neurologicalConditions', questionText: 'Do you have seizures or convulsions?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'seizureConvulsions' as const },
+  { id: 'weakness', category: 'neurologicalConditions', questionText: 'Do you have weakness?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'weakness' as const },
+  { id: 'stroke', category: 'neurologicalConditions', questionText: 'Have you had a stroke?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'stroke' as const },
+  { id: 'alzheimers', category: 'neurologicalConditions', questionText: 'Do you have Alzheimers?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'alzheimers' as const },
+  { id: 'pseudoTumorCerebral', category: 'neurologicalConditions', questionText: 'Do you have pseudo tumor cerebral?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'pseudoTumorCerebral' as const },
+  { id: 'multipleSclerosis', category: 'neurologicalConditions', questionText: 'Do you have multiple sclerosis?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'multipleSclerosis' as const },
+  { id: 'frequencySevereHeadaches', category: 'neurologicalConditions', questionText: 'Do you have frequent severe headaches?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'frequencySevereHeadaches' as const },
+  { id: 'knockedUnconscious', category: 'neurologicalConditions', questionText: 'Have you been knocked unconscious?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'knockedUnconscious' as const },
+
+  // BLOOD DISORDERS
+  { id: 'anemiaIronDeficient', category: 'bloodConditions', questionText: 'Do you have iron deficient anemia?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'anemiaIronDeficient' as const },
+  { id: 'anemiaVitaminB12Deficient', category: 'bloodConditions', questionText: 'Do you have Vitamin B12 deficient anemia?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'anemiaVitaminB12Deficient' as const },
+  { id: 'lowPlatelets', category: 'bloodConditions', questionText: 'Do you have low platelets?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'lowPlatelets' as const },
+  { id: 'lymphoma', category: 'bloodConditions', questionText: 'Do you have lymphoma?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'lymphoma' as const },
+  { id: 'swollenLymphNodes', category: 'bloodConditions', questionText: 'Do you have swollen lymph nodes?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'swollenLymphNodes' as const },
+  { id: 'superficialBloodClot', category: 'bloodConditions', questionText: 'Have you had a superficial blood clot in leg?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'superficialBloodClot' as const },
+  { id: 'deepBloodClot', category: 'bloodConditions', questionText: 'Have you had a deep blood clot in leg?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'deepBloodClot' as const },
+  { id: 'bloodClotLungs', category: 'bloodConditions', questionText: 'Have you had a blood clot in lungs?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'bloodClotLungs' as const },
+  { id: 'bleedingDisorder', category: 'bloodConditions', questionText: 'Do you have a bleeding disorder?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'bleedingDisorder' as const },
+
+  // ENDOCRINE CONDITIONS
+  { id: 'hypothyroid', category: 'endocrineConditions', questionText: 'Do you have hypothyroid?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'hypothyroid' as const },
+  { id: 'hyperthyroid', category: 'endocrineConditions', questionText: 'Do you have hyperthyroid?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'hyperthyroid' as const },
+  { id: 'goiter', category: 'endocrineConditions', questionText: 'Do you have a goiter?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'goiter' as const },
+  { id: 'parathyroid', category: 'endocrineConditions', questionText: 'Do you have parathyroid problems?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'parathyroid' as const },
+  { id: 'elevatedCholesterol', category: 'endocrineConditions', questionText: 'Do you have elevated cholesterol?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'elevatedCholesterol' as const },
+  { id: 'elevatedTriglycerides', category: 'endocrineConditions', questionText: 'Do you have elevated triglycerides?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'elevatedTriglycerides' as const },
+  { id: 'lowBloodSugar', category: 'endocrineConditions', questionText: 'Do you have low blood sugar?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'lowBloodSugar' as const },
+  { id: 'prediabetes', category: 'endocrineConditions', questionText: 'Do you have prediabetes?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'prediabetes' as const },
+  { id: 'gout', category: 'endocrineConditions', questionText: 'Do you have gout?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'gout' as const },
+  { id: 'endocrineGlandTumor', category: 'endocrineConditions', questionText: 'Do you have an endocrine gland tumor?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'endocrineGlandTumor' as const },
+  { id: 'cancerEndocrineGland', category: 'endocrineConditions', questionText: 'Have you had cancer of endocrine gland?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'cancerEndocrineGland' as const },
+  { id: 'highCalciumLevel', category: 'endocrineConditions', questionText: 'Do you have high calcium level?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'highCalciumLevel' as const },
+  { id: 'abnormalFacialHair', category: 'endocrineConditions', questionText: 'Do you have abnormal facial hair growth?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'abnormalFacialHair' as const },
+
+  // GASTROINTESTINAL CONDITIONS
+  { id: 'heartburn', category: 'gastrointestinalConditions', questionText: 'Do you have heartburn?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'heartburn' as const },
+  { id: 'hiatalHernia', category: 'gastrointestinalConditions', questionText: 'Do you have a hiatal hernia?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'hiatalHernia' as const },
+  { id: 'ulcers', category: 'gastrointestinalConditions', questionText: 'Do you have ulcers?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'ulcers' as const },
+  { id: 'diarrhea', category: 'gastrointestinalConditions', questionText: 'Do you have diarrhea?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'diarrhea' as const },
+  { id: 'bloodInStool', category: 'gastrointestinalConditions', questionText: 'Do you have blood in stool?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'bloodInStool' as const },
+  { id: 'changeInBowelHabit', category: 'gastrointestinalConditions', questionText: 'Have you had a change in bowel habit?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'changeInBowelHabit' as const },
+  { id: 'constipation', category: 'gastrointestinalConditions', questionText: 'Do you have constipation?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'constipation' as const },
+  { id: 'irritableBowel', category: 'gastrointestinalConditions', questionText: 'Do you have irritable bowel syndrome?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'irritableBowel' as const },
+  { id: 'colitis', category: 'gastrointestinalConditions', questionText: 'Do you have colitis?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'colitis' as const },
+  { id: 'crohns', category: 'gastrointestinalConditions', questionText: 'Do you have Crohns disease?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'crohns' as const },
+  { id: 'fissure', category: 'gastrointestinalConditions', questionText: 'Do you have a fissure?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'fissure' as const },
+  { id: 'rectalBleeding', category: 'gastrointestinalConditions', questionText: 'Do you have rectal bleeding?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'rectalBleeding' as const },
+  { id: 'blackTarryStools', category: 'gastrointestinalConditions', questionText: 'Do you have black tarry stools?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'blackTarryStools' as const },
+  { id: 'polyps', category: 'gastrointestinalConditions', questionText: 'Do you have polyps?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'polyps' as const },
+
+  // HEAD AND NECK CONDITIONS
+  { id: 'wearGlasses', category: 'headNeckConditions', questionText: 'Do you wear glasses?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'wearGlasses' as const },
+  { id: 'cataracts', category: 'headNeckConditions', questionText: 'Do you have cataracts?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'cataracts' as const },
+  { id: 'glaucoma', category: 'headNeckConditions', questionText: 'Do you have glaucoma?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'glaucoma' as const },
+  { id: 'wearContacts', category: 'headNeckConditions', questionText: 'Do you wear contacts?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'wearContacts' as const },
+  { id: 'hardOfHearing', category: 'headNeckConditions', questionText: 'Are you hard of hearing?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'hardOfHearing' as const },
+  { id: 'wearHearingAid', category: 'headNeckConditions', questionText: 'Do you wear a hearing aid?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'wearHearingAid' as const },
+  { id: 'dizziness', category: 'headNeckConditions', questionText: 'Do you have dizziness?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'dizziness' as const },
+  { id: 'faintingSpells', category: 'headNeckConditions', questionText: 'Do you have fainting spells?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'faintingSpells' as const },
+  { id: 'difficultySwallowing', category: 'headNeckConditions', questionText: 'Do you have difficulty swallowing?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'difficultySwallowing' as const },
+  { id: 'wearDentures', category: 'headNeckConditions', questionText: 'Do you wear dentures?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'wearDentures' as const },
+  { id: 'sinusProblems', category: 'headNeckConditions', questionText: 'Do you have sinus problems?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'sinusProblems' as const },
+  { id: 'lumpsInNeck', category: 'headNeckConditions', questionText: 'Do you have lumps in neck?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'lumpsInNeck' as const },
+  { id: 'hoarseness', category: 'headNeckConditions', questionText: 'Do you have hoarseness?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'hoarseness' as const },
+  { id: 'thyroidProblems', category: 'headNeckConditions', questionText: 'Do you have thyroid problems?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'thyroidProblems' as const },
+
+  // SKIN CONDITIONS
+  { id: 'rashes', category: 'skinConditions', questionText: 'Do you have rashes?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'rashes' as const },
+  { id: 'keloids', category: 'skinConditions', questionText: 'Do you have keloids?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'keloids' as const },
+  { id: 'poorWoundHealing', category: 'skinConditions', questionText: 'Do you have poor wound healing?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'poorWoundHealing' as const },
+  { id: 'frequentSkinInfections', category: 'skinConditions', questionText: 'Do you have frequent skin infections?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'frequentSkinInfections' as const },
+
+  // CONSTITUTIONAL SYMPTOMS
+  { id: 'fevers', category: 'constitutionalConditions', questionText: 'Do you have fevers?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'fevers' as const },
+  { id: 'nightSweats', category: 'constitutionalConditions', questionText: 'Do you have night sweats?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'nightSweats' as const },
+  { id: 'weightLoss', category: 'constitutionalConditions', questionText: 'Have you had weight loss?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'weightLoss' as const },
+  { id: 'chronicFatigue', category: 'constitutionalConditions', questionText: 'Do you have chronic fatigue?', expectedResponseType: 'yesno' as const, validationRules: { required: true }, fieldName: 'chronicFatigue' as const },
   // OTHER MEDICAL CONDITIONS
   {
     id: 'otherMedicalConditions',
@@ -1960,7 +2105,7 @@ export const patientInfoQuestions = [
 export const conversationalPatientInfo = {
   category: 'personal',
   introduction: 'Hola, soy tu asistente médico. Vamos a comenzar recopilando tu información personal básica. Esto nos ayudará a crear tu perfil médico.',
-  
+
   questions: [
     {
       id: 'firstName',
@@ -1969,7 +2114,7 @@ export const conversationalPatientInfo = {
       fieldName: 'firstName'
     },
     {
-      id: 'lastName', 
+      id: 'lastName',
       conversational: '¿Cuál es tu apellido?',
       followUp: 'Excelente. Ahora, ¿cuándo naciste? Puedes decirlo como prefieras, por ejemplo: "el 10 de enero de 1979" o "10/01/1979".',
       fieldName: 'lastName'

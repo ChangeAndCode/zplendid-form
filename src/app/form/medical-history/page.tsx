@@ -15,39 +15,177 @@ interface MedicalHistoryData {
   cpapDetails: string;
   diabetes: string;
   useInsulin: string;
-  
+
   // Other Conditions
   otherMedicalConditions: string;
-  
+
   // Heart Problems
   highBloodPressure: string;
   heartProblems: string;
-  
+  heartAttack: string;
+  angina: string;
+  rhythmDisturbance: string;
+  congestiveHeartFailure: string;
+  ankleSwelling: string;
+  varicoseVeins: string;
+  hemorrhoids: string;
+  phlebitis: string;
+  ankleLegUlcers: string;
+  heartBypass: string;
+  pacemaker: string;
+  cloggedHeartArteries: string;
+  rheumaticFever: string;
+  heartMurmur: string;
+  irregularHeartBeat: string;
+  crampingLegs: string;
+  otherHeartSymptoms: string;
+
   // Respiratory
   respiratoryProblems: string;
   respiratoryProblemsDetails: string;
-  
+  emphysema: string;
+  bronchitis: string;
+  pneumonia: string;
+  chronicCough: string;
+  shortOfBreath: string;
+  oxygenSupplement: string;
+  tuberculosis: string;
+  pulmonaryEmbolism: string;
+  hypoventilationSyndrome: string;
+  coughUpBlood: string;
+  snoring: string;
+  lungSurgery: string;
+  lungCancer: string;
+
   // Other Systems
   urinaryConditions: string;
   urinaryConditionsDetails: string;
+  kidneyStones: string;
+  frequentUrination: string;
+  bladderControl: string;
+  painfulUrination: string;
+
   muscularConditions: string;
   muscularConditionsDetails: string;
+  neckPain: string;
+  shoulderPain: string;
+  wristPain: string;
+  backPain: string;
+  hipPain: string;
+  kneePain: string;
+  anklePain: string;
+  footPain: string;
+  heelPain: string;
+  plantarFasciitis: string;
+  carpalTunnel: string;
+  lupus: string;
+  scleroderma: string;
+  sciatica: string;
+  autoimmuneDisease: string;
+  musclePainSpasm: string;
+  brokenBones: string;
+  jointReplacement: string;
+  nerveInjury: string;
+  muscularDystrophy: string;
+
   neurologicalConditions: string;
   neurologicalConditionsDetails: string;
+  balanceDisturbance: string;
+  seizure: string;
+  weakness: string;
+  stroke: string;
+  alzheimers: string;
+  pseudoTumorCerebral: string;
+  multipleSclerosis: string;
+  severeHeadaches: string;
+  knockedUnconscious: string;
+
   bloodDisorders: string;
   bloodDisordersDetails: string;
+  anemiaIron: string;
+  anemiaB12: string;
+  lowPlatelets: string;
+  lymphoma: string;
+  swollenLymphNodes: string;
+  superficialBloodClot: string;
+  deepBloodClot: string;
+  bloodClotLungs: string;
+  bloodTransfusion: string;
+  bloodThinningMedicine: string;
+
   endocrineCondition: string;
   endocrineConditionDetails: string;
+  hypothyroid: string;
+  hyperthyroid: string;
+  goiter: string;
+  parathyroid: string;
+  elevatedCholesterol: string;
+  elevatedTriglycerides: string;
+  lowBloodSugar: string;
+  prediabetes: string;
+  gout: string;
+  endocrineGlandTumor: string;
+  endocrineCancer: string;
+  highCalcium: string;
+  abnormalFacialHair: string;
+
   gastrointestinalConditions: string;
+  heartburn: string;
+  hiatalHernia: string;
+  ulcers: string;
+  diarrhea: string;
+  bloodInStool: string;
+  changeBowelHabit: string;
+  constipation: string;
+  irritableBowel: string;
+  colitis: string;
+  crohns: string;
+  fissure: string;
+  rectalBleeding: string;
+  blackTarryStools: string;
+  polyps: string;
+  abdominalPain: string;
+  enlargedLiver: string;
+  cirrhosisHepatitis: string;
+  gallbladderProblems: string;
+  jaundice: string;
+  pancreaticDisease: string;
+  unusualVomiting: string;
+
   headNeckConditions: string;
+  wearContactsGlasses: string;
+  visionProblems: string;
+  hearingProblems: string;
+  sinusDrainage: string;
+  neckLumps: string;
+  swallowingDifficulty: string;
+  dentures: string;
+  oralSores: string;
+  hoarseness: string;
+  headNeckSurgery: string;
+  headNeckCancer: string;
+
   skinConditions: string;
+  rashesUnderSkin: string;
+  keloids: string;
+  poorWoundHealing: string;
+  frequentSkinInfections: string;
+  skinSurgery: string;
+
   constitutionalSymptoms: string;
-  
+  fevers: string;
+  nightSweats: string;
+  anemia: string;
+  weightLoss: string;
+  chronicFatigue: string;
+  hairLoss: string;
+
   // Infectious Diseases
   hepatitis: string;
+  hepatitisType: string;
   hiv: string;
   refuseBlood: string;
-  
+
   // Psychiatric
   psychiatricHospital: string;
   attemptedSuicide: string;
@@ -57,37 +195,72 @@ interface MedicalHistoryData {
   psychiatricMedications: string;
   psychiatricTherapy: string;
   psychiatricHospitalization: string;
-  
+  physicallyAbused: string;
+  seenPsychiatrist: string;
+  chemicalDependency: string;
+  bipolar: string;
+  schizophrenia: string;
+
   // Social History
   tobacco: string;
   tobaccoDetails: string;
+  tobaccoAmount: string;
+  tobaccoYears: string;
+  tobaccoQuit: string;
+  snuff: string;
+  vape: string;
+
   alcohol: string;
   alcoholDetails: string;
+  alcoholFrequency: string;
+  alcoholAmount: string;
+  alcoholYears: string;
+  alcoholQuit: string;
+  alcoholConcern: string;
+
   drugs: string;
   drugsDetails: string;
+  drugsFrequency: string;
+  drugsQuit: string;
+
   caffeine: string;
+  caffeineAmount: string;
+  caffeineType: string;
+  carbonatedDrinks: string;
+  carbonatedType: string;
+  carbonatedAmount: string;
+
   diet: string;
+  sweetsFrequency: string;
+  fastFoodFrequency: string;
+
   otherSubstances: string;
-  
+  marijuana: string;
+  aspirin: string;
+  hormones: string;
+
   // Medications & Allergies
   medications: string;
   allergies: string;
-  
+
   // Past Surgical History
   previousSurgeries: string;
   surgicalComplications: string;
-  
+
   // Diet Program
   dietProgram: string;
-  
+
   // Only for Women
   pregnancy: string;
   pregnancyDetails: string;
-  
+  menstrualCycleDate: string;
+  hormonalContraception: string;
+  pregnanciesList: string;
+
   // Referral
   referral: string;
   referralDetails: string;
-  
+
   // Other
   otherConditions: string;
   hospitalizations: string;
@@ -100,6 +273,7 @@ export default function MedicalHistoryForm() {
   const router = useRouter();
   const [isHydrated, setIsHydrated] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [patientGender, setPatientGender] = useState<string>(''); // Para condicional de Women's Health
   const [formData, setFormData] = useState<MedicalHistoryData>({
     sleepApnea: '',
     useCpap: '',
@@ -109,23 +283,153 @@ export default function MedicalHistoryForm() {
     otherMedicalConditions: '',
     highBloodPressure: '',
     heartProblems: '',
+    heartAttack: '',
+    angina: '',
+    rhythmDisturbance: '',
+    congestiveHeartFailure: '',
+    ankleSwelling: '',
+    varicoseVeins: '',
+    hemorrhoids: '',
+    phlebitis: '',
+    ankleLegUlcers: '',
+    heartBypass: '',
+    pacemaker: '',
+    cloggedHeartArteries: '',
+    rheumaticFever: '',
+    heartMurmur: '',
+    irregularHeartBeat: '',
+    crampingLegs: '',
+    otherHeartSymptoms: '',
     respiratoryProblems: '',
     respiratoryProblemsDetails: '',
+    emphysema: '',
+    bronchitis: '',
+    pneumonia: '',
+    chronicCough: '',
+    shortOfBreath: '',
+    oxygenSupplement: '',
+    tuberculosis: '',
+    pulmonaryEmbolism: '',
+    hypoventilationSyndrome: '',
+    coughUpBlood: '',
+    snoring: '',
+    lungSurgery: '',
+    lungCancer: '',
     urinaryConditions: '',
     urinaryConditionsDetails: '',
+    kidneyStones: '',
+    frequentUrination: '',
+    bladderControl: '',
+    painfulUrination: '',
     muscularConditions: '',
     muscularConditionsDetails: '',
+    neckPain: '',
+    shoulderPain: '',
+    wristPain: '',
+    backPain: '',
+    hipPain: '',
+    kneePain: '',
+    anklePain: '',
+    footPain: '',
+    heelPain: '',
+    plantarFasciitis: '',
+    carpalTunnel: '',
+    lupus: '',
+    scleroderma: '',
+    sciatica: '',
+    autoimmuneDisease: '',
+    musclePainSpasm: '',
+    brokenBones: '',
+    jointReplacement: '',
+    nerveInjury: '',
+    muscularDystrophy: '',
     neurologicalConditions: '',
     neurologicalConditionsDetails: '',
+    balanceDisturbance: '',
+    seizure: '',
+    weakness: '',
+    stroke: '',
+    alzheimers: '',
+    pseudoTumorCerebral: '',
+    multipleSclerosis: '',
+    severeHeadaches: '',
+    knockedUnconscious: '',
     bloodDisorders: '',
     bloodDisordersDetails: '',
+    anemiaIron: '',
+    anemiaB12: '',
+    lowPlatelets: '',
+    lymphoma: '',
+    swollenLymphNodes: '',
+    superficialBloodClot: '',
+    deepBloodClot: '',
+    bloodClotLungs: '',
+    bloodTransfusion: '',
+    bloodThinningMedicine: '',
     endocrineCondition: '',
     endocrineConditionDetails: '',
+    hypothyroid: '',
+    hyperthyroid: '',
+    goiter: '',
+    parathyroid: '',
+    elevatedCholesterol: '',
+    elevatedTriglycerides: '',
+    lowBloodSugar: '',
+    prediabetes: '',
+    gout: '',
+    endocrineGlandTumor: '',
+    endocrineCancer: '',
+    highCalcium: '',
+    abnormalFacialHair: '',
     gastrointestinalConditions: '',
+    heartburn: '',
+    hiatalHernia: '',
+    ulcers: '',
+    diarrhea: '',
+    bloodInStool: '',
+    changeBowelHabit: '',
+    constipation: '',
+    irritableBowel: '',
+    colitis: '',
+    crohns: '',
+    fissure: '',
+    rectalBleeding: '',
+    blackTarryStools: '',
+    polyps: '',
+    abdominalPain: '',
+    enlargedLiver: '',
+    cirrhosisHepatitis: '',
+    gallbladderProblems: '',
+    jaundice: '',
+    pancreaticDisease: '',
+    unusualVomiting: '',
     headNeckConditions: '',
+    wearContactsGlasses: '',
+    visionProblems: '',
+    hearingProblems: '',
+    sinusDrainage: '',
+    neckLumps: '',
+    swallowingDifficulty: '',
+    dentures: '',
+    oralSores: '',
+    hoarseness: '',
+    headNeckSurgery: '',
+    headNeckCancer: '',
     skinConditions: '',
+    rashesUnderSkin: '',
+    keloids: '',
+    poorWoundHealing: '',
+    frequentSkinInfections: '',
+    skinSurgery: '',
     constitutionalSymptoms: '',
+    fevers: '',
+    nightSweats: '',
+    anemia: '',
+    weightLoss: '',
+    chronicFatigue: '',
+    hairLoss: '',
     hepatitis: '',
+    hepatitisType: '',
     hiv: '',
     refuseBlood: '',
     psychiatricHospital: '',
@@ -136,15 +440,42 @@ export default function MedicalHistoryForm() {
     psychiatricMedications: '',
     psychiatricTherapy: '',
     psychiatricHospitalization: '',
+    physicallyAbused: '',
+    seenPsychiatrist: '',
+    chemicalDependency: '',
+    bipolar: '',
+    schizophrenia: '',
     tobacco: '',
     tobaccoDetails: '',
+    tobaccoAmount: '',
+    tobaccoYears: '',
+    tobaccoQuit: '',
+    snuff: '',
+    vape: '',
     alcohol: '',
     alcoholDetails: '',
+    alcoholFrequency: '',
+    alcoholAmount: '',
+    alcoholYears: '',
+    alcoholQuit: '',
+    alcoholConcern: '',
     drugs: '',
     drugsDetails: '',
+    drugsFrequency: '',
+    drugsQuit: '',
     caffeine: '',
+    caffeineAmount: '',
+    caffeineType: '',
+    carbonatedDrinks: '',
+    carbonatedType: '',
+    carbonatedAmount: '',
     diet: '',
+    sweetsFrequency: '',
+    fastFoodFrequency: '',
     otherSubstances: '',
+    marijuana: '',
+    aspirin: '',
+    hormones: '',
     medications: '',
     allergies: '',
     previousSurgeries: '',
@@ -152,6 +483,9 @@ export default function MedicalHistoryForm() {
     dietProgram: '',
     pregnancy: '',
     pregnancyDetails: '',
+    menstrualCycleDate: '',
+    hormonalContraception: '',
+    pregnanciesList: '',
     referral: '',
     referralDetails: '',
     otherConditions: '',
@@ -177,6 +511,36 @@ export default function MedicalHistoryForm() {
     setIsHydrated(true);
   }, []);
 
+  // Cargar género del paciente desde Patient Info
+  useEffect(() => {
+    const loadPatientGender = async () => {
+      if (isAuthenticated && patientId) {
+        try {
+          const token = localStorage.getItem('token');
+          if (!token) return;
+
+          const response = await fetch('/api/forms/patient-info', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data && result.data.gender) {
+              setPatientGender(result.data.gender);
+            }
+          }
+        } catch (error) {
+          console.error('Error al cargar género del paciente:', error);
+        }
+      }
+    };
+
+    loadPatientGender();
+  }, [isAuthenticated, patientId]);
+
   // Cargar datos existentes del formulario
   useEffect(() => {
     const loadExistingData = async () => {
@@ -195,7 +559,13 @@ export default function MedicalHistoryForm() {
           if (response.ok) {
             const result = await response.json();
             if (result.success && result.data) {
-              setFormData(result.data);
+              // Asegurar que todos los campos tengan valores de string (no undefined/null)
+              const safeData: MedicalHistoryData = {} as MedicalHistoryData;
+              Object.keys(formData).forEach((key) => {
+                const fieldKey = key as keyof MedicalHistoryData;
+                safeData[fieldKey] = result.data[fieldKey] || '';
+              });
+              setFormData(safeData);
             }
           }
         } catch (error) {
@@ -220,7 +590,7 @@ export default function MedicalHistoryForm() {
         router.push('/');
         return;
       }
-      
+
       const response = await fetch('/api/forms/medical-history', {
         method: 'POST',
         headers: {
@@ -247,13 +617,14 @@ export default function MedicalHistoryForm() {
   };
 
   const handleNext = async () => {
-    if (currentStep < 4) {
+    if (currentStep < 13) {
       setCurrentStep(prev => prev + 1);
     } else {
       // Envío final del formulario
       const saved = await handleSave();
       if (saved) {
-        router.push('/landing');
+        // Navigate to next module (Family Info - Module 4)
+        router.push('/form/family-info');
       }
     }
   };
@@ -296,7 +667,7 @@ export default function MedicalHistoryForm() {
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
-              <StepNumber 
+              <StepNumber
                 stepNumber={3}
                 totalSteps={4}
                 isActive={true}
@@ -323,12 +694,13 @@ export default function MedicalHistoryForm() {
         </div>
 
         <MedicalHistorySteps
+          currentStep={currentStep}
+          totalSteps={13}
           formData={formData}
+          patientGender={patientGender}
           onFormDataChange={handleFormDataChange}
           onNext={handleNext}
           onPrevious={handlePrevious}
-          currentStep={currentStep}
-          totalSteps={4}
         />
       </div>
     </div>

@@ -98,7 +98,7 @@ export default function LandingPage() {
         if (!token) return;
 
         const completed: string[] = [];
-        
+
         // Verificar cada formulario
         const formChecks = [
           { id: 'patient-info', url: '/api/forms/patient-info' },
@@ -122,34 +122,34 @@ export default function LandingPage() {
               if (result.success && result.data) {
                 // Verificar si tiene datos válidos según el tipo de formulario
                 let isCompleted = false;
-                
+
                 switch (form.id) {
                   case 'patient-info':
                     isCompleted = !!(result.data.firstName && result.data.lastName && result.data.email);
                     break;
                   case 'family-info':
                     // Verificar que al menos 2 campos no estén vacíos o en 'unknown'
-                    const familyFields = Object.entries(result.data).filter(([key, value]) => 
+                    const familyFields = Object.entries(result.data).filter(([key, value]) =>
                       key !== 'patientId' && value && value !== 'unknown' && value !== ''
                     );
                     isCompleted = familyFields.length >= 2;
                     break;
                   case 'medical-history':
-                    isCompleted = !!(result.data.medications || result.data.allergies || 
-                      result.data.sleepApnea === 'yes' || result.data.diabetes === 'yes' || 
+                    isCompleted = !!(result.data.medications || result.data.allergies ||
+                      result.data.sleepApnea === 'yes' || result.data.diabetes === 'yes' ||
                       result.data.highBloodPressure === 'yes' || result.data.otherMedicalConditions);
                     break;
                   case 'surgery-interest':
                     // Verificar que al menos algunos campos importantes no estén vacíos
-                    const surgeryFields = Object.entries(result.data).filter(([key, value]) => 
-                      value && value !== 'unknown' && value !== '' && 
-                      (key === 'surgeryInterest' || key === 'previousWeightLossSurgery' || 
-                       key === 'consultedAboutWeightLoss' || key === 'surgeryReadiness')
+                    const surgeryFields = Object.entries(result.data).filter(([key, value]) =>
+                      value && value !== 'unknown' && value !== '' &&
+                      (key === 'surgeryInterest' || key === 'previousWeightLossSurgery' ||
+                        key === 'consultedAboutWeightLoss' || key === 'surgeryReadiness')
                     );
                     isCompleted = surgeryFields.length >= 1;
                     break;
                 }
-                
+
                 if (isCompleted) {
                   completed.push(form.id);
                 }
@@ -211,11 +211,11 @@ export default function LandingPage() {
         {/* Hero Section */}
         <div className="mb-8">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#212e5c] mb-6 leading-tight tracking-tight">
-            {language === 'es' 
-              ? 'Construyamos tu expediente juntos' 
+            {language === 'es'
+              ? 'Construyamos tu expediente juntos'
               : 'Let\'s build your medical record together'}
           </h2>
-          
+
           <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mb-10 leading-relaxed">
             {language === 'es'
               ? 'Para brindarte la mejor consulta posible, ayúdanos a conocerte mejor. Tu información es confidencial y nos permite cuidarte de forma personalizada.'
@@ -240,97 +240,65 @@ export default function LandingPage() {
           )}
         </div>
 
-        {/* Global Progress Indicator */}
-        {completedForms.length > 0 && (
-          <GlobalProgress completedForms={completedForms} totalForms={4} />
-        )}
-
-        {/* Chat Assistant Button */}
-        <div className="mb-8">
+        {/* Main Options - Two Big Buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
+          {/* Conversational Assistant Button */}
           <a
             href="/chat"
-            className="group block w-full bg-gradient-to-r from-[#212e5c] to-[#1a2347] rounded-lg border border-[#212e5c] hover:from-[#1a2347] hover:to-[#0f1420] transition-all duration-200 text-left cursor-pointer shadow-lg hover:shadow-xl"
+            className="group block w-full bg-gradient-to-br from-[#212e5c] to-[#1a2347] rounded-xl border border-[#212e5c] hover:from-[#1a2347] hover:to-[#0f1420] transition-all duration-300 text-left cursor-pointer shadow-lg hover:shadow-2xl transform hover:-translate-y-1"
           >
-            <div className="p-6 sm:p-8 lg:p-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-4 sm:gap-6 mb-4">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/10 rounded-full flex items-center justify-center text-2xl sm:text-3xl">
-                    🤖
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white group-hover:text-gray-100 transition-colors mb-2">
-                      {language === 'es' ? 'Asistente Conversacional' : 'Conversational Assistant'}
-                    </h3>
-                    <p className="text-sm sm:text-base text-blue-100 group-hover:text-white transition-colors">
-                      {language === 'es' 
-                        ? 'Completa tu cuestionario médico de forma natural y conversacional'
-                        : 'Complete your medical questionnaire in a natural and conversational way'}
-                    </p>
-                  </div>
+            <div className="p-8 h-full flex flex-col justify-between">
+              <div>
+                <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-4xl mb-6 group-hover:scale-110 transition-transform duration-300">
+                  🤖
                 </div>
+                <h3 className="text-2xl font-bold text-white mb-3">
+                  {language === 'es' ? 'Asistente Conversacional' : 'Conversational Assistant'}
+                </h3>
+                <p className="text-blue-100 text-lg leading-relaxed">
+                  {language === 'es'
+                    ? 'Completa tu cuestionario médico de forma natural y conversacional.'
+                    : 'Complete your medical questionnaire in a natural and conversational way.'}
+                </p>
               </div>
-              
-              <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 sm:ml-8">
-                <span className="text-xs sm:text-sm text-blue-200 whitespace-nowrap">
-                  {language === 'es' ? '15-20 min' : '15-20 min'}
-                </span>
-                <svg 
-                  className="w-6 h-6 sm:w-8 sm:h-8 text-white group-hover:text-gray-100 group-hover:translate-x-1 transition-all" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+
+              <div className="mt-8 flex items-center text-blue-200 font-medium group-hover:text-white transition-colors">
+                <span>{language === 'es' ? 'Comenzar chat' : 'Start chat'}</span>
+                <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                 </svg>
               </div>
             </div>
           </a>
-        </div>
 
-        {/* Form Modules - minimalista */}
-        <div className="space-y-4 mb-20">
-          {formModules.map((module, index) => (
-            <a
-              key={module.id}
-              href={module.route}
-              className="group block w-full bg-white rounded-lg border border-gray-200 hover:border-[#212e5c] transition-all duration-200 text-left cursor-pointer"
-            >
-              <div className="p-4 sm:p-6 lg:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 sm:gap-6 mb-3">
-                    <StepNumber 
-                      stepNumber={index + 1}
-                      totalSteps={4}
-                      isActive={completedForms.includes(module.id)}
-                      className="flex-shrink-0"
-                    />
-                    <div className="flex-1">
-                      <h4 className="text-lg sm:text-xl lg:text-2xl font-semibold text-[#212e5c] group-hover:text-[#1a2347] transition-colors mb-2">
-                        {language === 'es' ? module.title : module.titleEn}
-                      </h4>
-                      <p className="text-sm sm:text-base text-gray-600">
-                        {language === 'es' ? module.description : module.descriptionEn}
-                      </p>
-                    </div>
-                  </div>
+          {/* Step-by-Step Questionnaire Button */}
+          <a
+            href="/form/patient-info"
+            className="group block w-full bg-white rounded-xl border-2 border-gray-100 hover:border-[#212e5c] transition-all duration-300 text-left cursor-pointer shadow-lg hover:shadow-2xl transform hover:-translate-y-1"
+          >
+            <div className="p-8 h-full flex flex-col justify-between">
+              <div>
+                <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-4xl mb-6 group-hover:scale-110 transition-transform duration-300">
+                  📝
                 </div>
-                
-                <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 sm:ml-8">
-                  <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
-                    {language === 'es' ? module.estimatedTime : module.estimatedTimeEn}
-                  </span>
-                  <svg 
-                    className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 group-hover:text-[#212e5c] group-hover:translate-x-1 transition-all" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
+                <h3 className="text-2xl font-bold text-[#212e5c] mb-3">
+                  {language === 'es' ? 'Cuestionario Paso a Paso' : 'Step-by-Step Questionnaire'}
+                </h3>
+                <p className="text-gray-600 text-lg leading-relaxed">
+                  {language === 'es'
+                    ? 'Llena los formularios manualmente a tu propio ritmo, sección por sección.'
+                    : 'Fill out the forms manually at your own pace, section by section.'}
+                </p>
               </div>
-            </a>
-          ))}
+
+              <div className="mt-8 flex items-center text-[#212e5c] font-medium group-hover:translate-x-1 transition-transform">
+                <span>{language === 'es' ? 'Comenzar formulario' : 'Start form'}</span>
+                <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </div>
+            </div>
+          </a>
         </div>
 
         {/* Contact Section - minimalista */}
@@ -339,15 +307,15 @@ export default function LandingPage() {
             {language === 'es' ? '¿Necesitas asistencia?' : 'Need assistance?'}
           </h3>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
-            <a 
-              href="tel:+16194716097" 
+            <a
+              href="tel:+16194716097"
               className="text-white hover:text-gray-200 transition-colors font-medium text-sm sm:text-base"
             >
               +1 (619) 471-6097
             </a>
             <span className="hidden sm:block text-white/30">|</span>
-            <a 
-              href="mailto:info@zplendid.com" 
+            <a
+              href="mailto:info@zplendid.com"
               className="text-white hover:text-gray-200 transition-colors font-medium text-sm sm:text-base"
             >
               info@zplendid.com
