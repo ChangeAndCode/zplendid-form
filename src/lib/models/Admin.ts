@@ -146,7 +146,20 @@ export class AdminModel {
         },
         {
           $project: {
-            id: { $ifNull: [{ $toInt: { $substr: ['$_id', -8, 8] } }, '$_id'] },
+            id: { 
+              $ifNull: [
+                { 
+                  $toInt: { 
+                    $substr: [
+                      { $toString: '$_id' }, 
+                      -8, 
+                      8
+                    ] 
+                  } 
+                }, 
+                0
+              ] 
+            },
             patientId: { $ifNull: [{ $arrayElemAt: ['$patientRecord.patientId', 0] }, 'Sin ID'] },
             firstName: 1,
             lastName: 1,
@@ -200,7 +213,20 @@ export class AdminModel {
         { $unwind: '$user' },
         {
           $project: {
-            id: { $ifNull: [{ $toInt: { $substr: ['$_id', -8, 8] } }, '$_id'] },
+            id: { 
+              $ifNull: [
+                { 
+                  $toInt: { 
+                    $substr: [
+                      { $toString: '$_id' }, 
+                      -8, 
+                      8
+                    ] 
+                  } 
+                }, 
+                0
+              ] 
+            },
             userId: 1,
             licenseNumber: 1,
             specialties: 1,
@@ -469,7 +495,20 @@ export class AdminModel {
         { $unwind: '$doctorUser' },
         {
           $project: {
-            id: { $ifNull: [{ $toInt: { $substr: ['$_id', -8, 8] } }, '$_id'] },
+            id: { 
+              $ifNull: [
+                { 
+                  $toInt: { 
+                    $substr: [
+                      { $toString: '$_id' }, 
+                      -8, 
+                      8
+                    ] 
+                  } 
+                }, 
+                0
+              ] 
+            },
             patientId: 1,
             interestArea: 1,
             assignedAt: 1,
@@ -583,7 +622,20 @@ export class AdminModel {
         {
           $project: {
             _id: 1,
-            id: { $ifNull: [{ $toInt: { $substr: ['$_id', -8, 8] } }, '$_id'] },
+            id: { 
+              $ifNull: [
+                { 
+                  $toInt: { 
+                    $substr: [
+                      { $toString: '$_id' }, 
+                      -8, 
+                      8
+                    ] 
+                  } 
+                }, 
+                0
+              ] 
+            },
             userId: 1,
             licenseNumber: 1,
             specialties: 1,
@@ -653,7 +705,20 @@ export class AdminModel {
         },
         {
           $project: {
-            id: { $ifNull: [{ $toInt: { $substr: ['$_id', -8, 8] } }, '$_id'] },
+            id: { 
+              $ifNull: [
+                { 
+                  $toInt: { 
+                    $substr: [
+                      { $toString: '$_id' }, 
+                      -8, 
+                      8
+                    ] 
+                  } 
+                }, 
+                0
+              ] 
+            },
             patientId: { $ifNull: [{ $arrayElemAt: ['$patientRecord.patientId', 0] }, 'Sin ID'] },
             firstName: 1,
             lastName: 1,
