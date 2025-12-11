@@ -222,10 +222,12 @@ export function generatePatientPDF(
   };
 
   // Función auxiliar para renderizar un campo individual (una columna)
-  const renderFieldSingle = (key: string, value: unknown, label: string, xPos: number, width: number) => {
+  const renderFieldSingle = (key: string, value: unknown, label: string, xPos: number, width: number, skipPageBreak: boolean = false) => {
     if (!value || value === '' || value === null || value === undefined) return false;
 
-    checkPageBreak(12);
+    if (!skipPageBreak) {
+      checkPageBreak(12);
+    }
     
     doc.setTextColor(80, 80, 80);
     doc.setFontSize(9);
@@ -275,8 +277,9 @@ export function generatePatientPDF(
     const lines = doc.splitTextToSize(valueStr, width - 5);
     doc.text(lines, xPos, yPosition + 5);
     
-    yPosition += 5 + (lines.length * 5) + 3;
-    return true;
+    const fieldHeight = 5 + (lines.length * 5) + 3;
+    yPosition += fieldHeight;
+    return fieldHeight;
   };
 
   // Función auxiliar para renderizar un campo individual (compatibilidad)
@@ -414,18 +417,19 @@ export function generatePatientPDF(
         const currentY = useLeftColumn ? leftColumnY : rightColumnY;
         const currentX = useLeftColumn ? leftColumnX : rightColumnX;
         
-        // Verificar si necesitamos nueva página
-        if (currentY + 15 > pageHeight - margin - 20) {
+        // Verificar si necesitamos nueva página (verificar ambas columnas)
+        const maxColumnY = Math.max(leftColumnY, rightColumnY);
+        if (maxColumnY + 15 > pageHeight - margin - 20) {
           doc.addPage();
           leftColumnY = margin;
           rightColumnY = margin;
           useLeftColumn = true;
         }
 
-        // Renderizar campo
+        // Renderizar campo (sin checkPageBreak interno ya que lo manejamos manualmente)
         const savedY = yPosition;
-        yPosition = currentY;
-        renderFieldSingle(field.key, field.value, field.label, currentX, columnWidth);
+        yPosition = useLeftColumn ? leftColumnY : rightColumnY;
+        const fieldHeight = renderFieldSingle(field.key, field.value, field.label, currentX, columnWidth, true);
         
         // Actualizar posición de la columna correspondiente
         if (useLeftColumn) {
@@ -436,11 +440,6 @@ export function generatePatientPDF(
         
         // Alternar columna para el siguiente campo
         useLeftColumn = !useLeftColumn;
-        
-        // Si terminamos de usar ambas columnas, actualizar yPosition global
-        if (useLeftColumn) {
-          yPosition = Math.max(leftColumnY, rightColumnY);
-        }
       });
 
       // Asegurar que yPosition esté en la posición más baja después de dos columnas
