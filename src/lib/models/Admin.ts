@@ -83,12 +83,91 @@ export interface DoctorSummary {
 
 export class AdminModel {
   /**
+   * Crear tabla de doctores si no existe
+   */
+  static async createDoctorsTable(): Promise<void> {
+    const connection = await getConnection();
+    
+    try {
+      const createTableQuery = `
+        CREATE TABLE IF NOT EXISTS doctors (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          userId INT NOT NULL,
+          licenseNumber VARCHAR(100) UNIQUE NOT NULL,
+          specialties JSON,
+          isActive BOOLEAN DEFAULT true,
+          isApproved BOOLEAN DEFAULT false,
+          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_userId (userId),
+          INDEX idx_licenseNumber (licenseNumber),
+          INDEX idx_isApproved (isApproved),
+          FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `;
+
+      await connection.execute(createTableQuery);
+      console.log('✅ Tabla doctors verificada/creada');
+    } catch (error) {
+      console.error('❌ Error al crear tabla doctors:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear tabla de asignaciones si no existe
+   */
+  static async createAssignmentsTable(): Promise<void> {
+    const connection = await getConnection();
+    
+    try {
+      // Primero asegurar que la tabla doctors existe (para la foreign key)
+      await this.createDoctorsTable();
+      
+      const createTableQuery = `
+        CREATE TABLE IF NOT EXISTS patient_assignments (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          patientId VARCHAR(20) NOT NULL,
+          doctorId INT NOT NULL,
+          interestArea VARCHAR(100) NOT NULL DEFAULT 'No especificado',
+          assignedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          status ENUM('assigned', 'contacted', 'completed') DEFAULT 'assigned',
+          notes TEXT,
+          updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_patientId (patientId),
+          INDEX idx_doctorId (doctorId),
+          INDEX idx_interestArea (interestArea),
+          INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `;
+
+      await connection.execute(createTableQuery);
+      console.log('✅ Tabla patient_assignments verificada/creada');
+      
+    } catch (error) {
+      console.error('Error al crear/verificar tabla patient_assignments:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Inicializar todas las tablas necesarias para el admin
+   */
+  static async initializeTables(): Promise<void> {
+    await this.createDoctorsTable();
+    await this.createAssignmentsTable();
+  }
+
+  /**
    * Obtener estadísticas generales del panel de administrador
    */
   static async getDashboardStats(): Promise<AdminStats> {
     const connection = await getConnection();
     
     try {
+      // Asegurar que las tablas existen
+      await this.createDoctorsTable();
+      
       // Total de pacientes (usuarios con rol 'user')
       const [patientCount] = await connection.execute(
         `SELECT COUNT(*) as totalPatients 
@@ -180,6 +259,9 @@ export class AdminModel {
     const connection = await getConnection();
     
     try {
+      // Asegurar que la tabla existe
+      await this.createDoctorsTable();
+      
       const [doctors] = await connection.execute(
         `SELECT 
            d.id,
@@ -242,6 +324,9 @@ export class AdminModel {
     const connection = await getConnection();
     
     try {
+      // Asegurar que la tabla existe
+      await this.createDoctorsTable();
+      
       await connection.execute(
         'UPDATE doctors SET isApproved = true, updatedAt = NOW() WHERE id = ?',
         [doctorId]
@@ -259,6 +344,9 @@ export class AdminModel {
     const connection = await getConnection();
     
     try {
+      // Asegurar que la tabla existe
+      await this.createDoctorsTable();
+      
       await connection.execute(
         'UPDATE doctors SET isApproved = false, updatedAt = NOW() WHERE id = ?',
         [doctorId]
@@ -458,7 +546,8 @@ export class AdminModel {
     const connection = await getConnection();
     
     try {
-      // Asegurar que la tabla existe
+      // Asegurar que las tablas existen
+      await this.createDoctorsTable();
       await this.createAssignmentsTable();
       
       const [assignments] = await connection.execute(
@@ -557,6 +646,9 @@ export class AdminModel {
     const connection = await getConnection();
     
     try {
+      // Asegurar que la tabla existe
+      await this.createDoctorsTable();
+      
       const [doctors] = await connection.execute(
         `SELECT d.*, u.firstName, u.lastName, u.email
          FROM doctors d
