@@ -5,7 +5,7 @@ import { generatePatientPDF } from '../../../../../../lib/utils/patientPdfGenera
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { patientId: string } }
+  { params }: { params: Promise<{ patientId: string }> }
 ) {
   try {
     // Verificar autenticación
@@ -29,7 +29,7 @@ export async function GET(
       );
     }
 
-    const { patientId } = params;
+    const { patientId } = await params;
     const searchParams = request.nextUrl.searchParams;
     const language = (searchParams.get('language') || 'es') as 'es' | 'en';
 

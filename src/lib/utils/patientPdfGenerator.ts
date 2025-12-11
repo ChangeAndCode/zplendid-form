@@ -139,11 +139,13 @@ export function generatePatientPDF(
     infoY += 6;
   }
   if (patientData.email) {
-    doc.text(`📧 ${patientData.email}`, margin + 5, infoY);
+    const emailLabel = language === 'es' ? 'Email: ' : 'Email: ';
+    doc.text(emailLabel + patientData.email, margin + 5, infoY);
     infoY += 6;
   }
   if (patientData.phoneNumber) {
-    doc.text(`📞 ${patientData.phoneNumber}`, margin + 5, infoY);
+    const phoneLabel = language === 'es' ? 'Teléfono: ' : 'Phone: ';
+    doc.text(phoneLabel + patientData.phoneNumber, margin + 5, infoY);
   }
   
   yPosition += boxHeight + 5;
