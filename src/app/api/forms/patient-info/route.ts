@@ -4,6 +4,7 @@ import { getCollection } from '../../../../lib/config/database';
 import { ObjectId } from 'mongodb';
 import { JWTUtils } from '../../../../lib/utils/jwt';
 import { AutoSchema } from '../../../../lib/utils/autoSchema';
+import { getUserIdAsObjectId } from '../../../../lib/utils/mongoIdHelper';
 
 interface PatientInfoData {
   firstName: string;
@@ -71,9 +72,14 @@ export async function GET(request: NextRequest) {
 
     // Buscar registro médico
     const medicalRecordsCollection = await getCollection('medical_records');
-    const userIdValue = typeof decoded.userId === 'string' && ObjectId.isValid(decoded.userId)
-      ? new ObjectId(decoded.userId)
-      : decoded.userId;
+    const userIdValue = await getUserIdAsObjectId(decoded.userId);
+    
+    if (!userIdValue) {
+      return NextResponse.json(
+        { success: false, message: 'Usuario no encontrado' },
+        { status: 404 }
+      );
+    }
     
     const medicalRecord = await medicalRecordsCollection.findOne({ userId: userIdValue });
     
@@ -190,9 +196,14 @@ export async function POST(request: NextRequest) {
 
     // Buscar o crear registro médico
     const medicalRecordsCollection = await getCollection('medical_records');
-    const userIdValue = typeof decoded.userId === 'string' && ObjectId.isValid(decoded.userId)
-      ? new ObjectId(decoded.userId)
-      : decoded.userId;
+    const userIdValue = await getUserIdAsObjectId(decoded.userId);
+    
+    if (!userIdValue) {
+      return NextResponse.json(
+        { success: false, message: 'Usuario no encontrado' },
+        { status: 404 }
+      );
+    }
     
     let medicalRecord = await medicalRecordsCollection.findOne({ userId: userIdValue });
     let medicalRecordId: any;
@@ -217,9 +228,9 @@ export async function POST(request: NextRequest) {
 
     // Guardar los datos del formulario en la tabla específica
     // Función para asegurar que todos los valores sean strings
-    const mapStringValue = (value: string): string => {
+    const mapStringValue = (value: any): string => {
       // Si está vacío, undefined, null, o no es string, devolver string vacío
-      if (!value || value === '' || value === 'undefined' || value === 'null') {
+      if (value === null || value === undefined || value === '' || value === 'undefined' || value === 'null') {
         return '';
       }
       // Devolver el valor como string
