@@ -150,8 +150,79 @@ export function generatePatientPDF(
       .trim();
   };
 
-  // Función auxiliar para renderizar un campo individual
-  const renderField = (key: string, value: unknown, label: string) => {
+  // Función para mapear valores PGWBI (0-6) a texto legible
+  const mapPgwbiValue = (value: string | number, lang: 'es' | 'en'): string => {
+    const val = String(value).trim();
+    const map: Record<string, { es: string; en: string }> = {
+      '6': { es: 'Muy bien', en: 'Very well' },
+      '5': { es: 'Bien', en: 'Well' },
+      '4': { es: 'Bastante bien', en: 'Fairly well' },
+      '3': { es: 'Bastante mal', en: 'Fairly bad' },
+      '2': { es: 'Mal', en: 'Bad' },
+      '1': { es: 'Muy mal', en: 'Very bad' },
+      '0': { es: 'No sé', en: 'Don\'t know' }
+    };
+    return map[val] ? map[val][lang] : String(value);
+  };
+
+  // Función para mapear valores GERD (0-4) a texto legible
+  const mapGerdValue = (value: string | number, lang: 'es' | 'en'): string => {
+    const val = String(value).trim();
+    const map: Record<string, { es: string; en: string }> = {
+      '4': { es: 'Siempre', en: 'Always' },
+      '3': { es: 'Frecuentemente', en: 'Frequently' },
+      '2': { es: 'Algunas veces', en: 'Sometimes' },
+      '1': { es: 'Raramente', en: 'Rarely' },
+      '0': { es: 'Nunca', en: 'Never' }
+    };
+    return map[val] ? map[val][lang] : String(value);
+  };
+
+  // Función para obtener etiqueta descriptiva de PGWBI
+  const getPgwbiLabel = (key: string, lang: 'es' | 'en'): string => {
+    const labels: Record<string, { es: string; en: string }> = {
+      'pgwbi1Anxious': { es: '¿Se ha sentido ansioso, preocupado o inquieto?', en: 'Have you been anxious, worried or upset?' },
+      'pgwbi2Depressed': { es: '¿Se ha sentido deprimido o triste?', en: 'Have you been depressed or sad?' },
+      'pgwbi3SelfControl': { es: '¿Ha tenido control sobre sus emociones?', en: 'Have you had control over your emotions?' },
+      'pgwbi4Vitality': { es: '¿Se ha sentido lleno de energía y vitalidad?', en: 'Have you felt full of energy and vitality?' },
+      'pgwbi5Health': { es: '¿Se sintió lo suficientemente saludable?', en: 'Did you feel healthy enough?' },
+      'pgwbi6Spirits': { es: '¿Cómo se sintió anímicamente?', en: 'How did you feel in spirits?' },
+      'pgwbi7Worried': { es: '¿Se ha sentido preocupado?', en: 'Have you been worried?' },
+      'pgwbi8Energy': { es: '¿Cuánta energía tuvo o sintió?', en: 'How much energy did you have or feel?' },
+      'pgwbi9Mood': { es: '¿Cómo fue su estado de ánimo?', en: 'How was your mood?' },
+      'pgwbi10Tension': { es: '¿Se sintió tenso?', en: 'Were you tense?' },
+      'pgwbi11Happiness': { es: '¿Qué tan feliz se sintió?', en: 'How happy did you feel?' },
+      'pgwbi12Interest': { es: '¿Su vida diaria estuvo llena de cosas interesantes?', en: 'Was your daily life full of interesting things?' },
+      'pgwbi13Calm': { es: '¿Se sintió tranquilo y en calma?', en: 'Did you feel calm and at ease?' },
+      'pgwbi14Sad': { es: '¿Se sintió triste o desanimado?', en: 'Did you feel sad or downhearted?' },
+      'pgwbi15Active': { es: '¿Se sintió activo y vigoroso?', en: 'Did you feel active and vigorous?' },
+      'pgwbi16Cheerful': { es: '¿Se sintió alegre y despreocupado?', en: 'Did you feel cheerful and lighthearted?' },
+      'pgwbi17Tired': { es: '¿Se sintió cansado o agotado?', en: 'Did you feel tired or exhausted?' },
+      'pgwbi18Pressure': { es: '¿Sintió presión, estrés o tensión?', en: 'Did you feel strain, stress or pressure?' }
+    };
+    return labels[key] ? labels[key][lang] : formatKeyAsLabel(key);
+  };
+
+  // Función auxiliar para determinar si un campo puede usar dos columnas (respuesta corta)
+  const canUseTwoColumns = (key: string, value: unknown): boolean => {
+    // Campos PGWBI y GERD siempre pueden usar dos columnas
+    if (key.startsWith('pgwbi') || key.startsWith('gerd')) {
+      return true;
+    }
+    // Valores numéricos simples
+    if (typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value.trim()))) {
+      return true;
+    }
+    // Valores cortos (sí/no, opciones cortas)
+    const strValue = String(value);
+    if (strValue.length <= 30 && !strValue.includes('\n') && !strValue.includes(',')) {
+      return true;
+    }
+    return false;
+  };
+
+  // Función auxiliar para renderizar un campo individual (una columna)
+  const renderFieldSingle = (key: string, value: unknown, label: string, xPos: number, width: number) => {
     if (!value || value === '' || value === null || value === undefined) return false;
 
     checkPageBreak(12);
@@ -159,13 +230,13 @@ export function generatePatientPDF(
     doc.setTextColor(80, 80, 80);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
-    doc.text(label + ':', margin + 5, yPosition);
+    doc.text(label + ':', xPos, yPosition);
     
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     
-    // Manejar diferentes tipos de valores
+    // Manejar diferentes tipos de valores y aplicar mapeos
     let valueStr: string;
     if (typeof value === 'object' && value !== null) {
       // Si es un objeto, formatearlo de manera legible
@@ -191,13 +262,26 @@ export function generatePatientPDF(
         }
       }
     } else {
-      valueStr = String(value);
+      const strVal = String(value).trim();
+      // Aplicar mapeos para PGWBI y GERD
+      if (key.startsWith('pgwbi')) {
+        valueStr = mapPgwbiValue(strVal, language);
+      } else if (key.startsWith('gerd')) {
+        valueStr = mapGerdValue(strVal, language);
+      } else {
+        valueStr = strVal;
+      }
     }
-    const lines = doc.splitTextToSize(valueStr, contentWidth - 15);
-    doc.text(lines, margin + 5, yPosition + 5);
+    const lines = doc.splitTextToSize(valueStr, width - 5);
+    doc.text(lines, xPos, yPosition + 5);
     
     yPosition += 5 + (lines.length * 5) + 3;
     return true;
+  };
+
+  // Función auxiliar para renderizar un campo individual (compatibilidad)
+  const renderField = (key: string, value: unknown, label: string) => {
+    return renderFieldSingle(key, value, label, margin + 5, contentWidth - 15);
   };
 
   // Función auxiliar para renderizar una sección
@@ -273,21 +357,95 @@ export function generatePatientPDF(
     
     yPosition += 15;
 
-    // Primero renderizar campos que están en la definición (con sus etiquetas)
+    // Preparar todos los campos con sus valores y etiquetas
+    const allFieldsToRender: Array<{ key: string; value: unknown; label: string }> = [];
+    
+    // Campos que están en la definición
     fields.forEach(field => {
       if (fieldsInDefinition.includes(field.key)) {
         const value = data[field.key];
-        const label = language === 'es' ? field.label : field.labelEn;
-        renderField(field.key, value, label);
+        let label = language === 'es' ? field.label : field.labelEn;
+        // Aplicar etiquetas descriptivas para PGWBI
+        if (field.key.startsWith('pgwbi')) {
+          label = getPgwbiLabel(field.key, language);
+        }
+        allFieldsToRender.push({ key: field.key, value, label });
       }
     });
 
-    // Luego renderizar campos adicionales que no están en la definición
+    // Campos adicionales que no están en la definición
     fieldsNotInDefinition.forEach(key => {
       const value = data[key];
-      const label = formatKeyAsLabel(key);
-      renderField(key, value, label);
+      let label = formatKeyAsLabel(key);
+      // Aplicar etiquetas descriptivas para PGWBI
+      if (key.startsWith('pgwbi')) {
+        label = getPgwbiLabel(key, language);
+      }
+      allFieldsToRender.push({ key, value, label });
     });
+
+    // Separar campos en dos grupos: los que pueden usar dos columnas y los que no
+    const shortFields: Array<{ key: string; value: unknown; label: string }> = [];
+    const longFields: Array<{ key: string; value: unknown; label: string }> = [];
+
+    allFieldsToRender.forEach(field => {
+      if (canUseTwoColumns(field.key, field.value)) {
+        shortFields.push(field);
+      } else {
+        longFields.push(field);
+      }
+    });
+
+    // Renderizar campos largos primero (una columna completa)
+    longFields.forEach(field => {
+      renderField(field.key, field.value, field.label);
+    });
+
+    // Renderizar campos cortos en dos columnas
+    if (shortFields.length > 0) {
+      const columnWidth = (contentWidth - 10) / 2; // Ancho de cada columna (con espacio entre ellas)
+      const leftColumnX = margin + 5;
+      const rightColumnX = margin + 5 + columnWidth + 10;
+      let leftColumnY = yPosition;
+      let rightColumnY = yPosition;
+      let useLeftColumn = true;
+
+      shortFields.forEach((field, index) => {
+        const currentY = useLeftColumn ? leftColumnY : rightColumnY;
+        const currentX = useLeftColumn ? leftColumnX : rightColumnX;
+        
+        // Verificar si necesitamos nueva página
+        if (currentY + 15 > pageHeight - margin - 20) {
+          doc.addPage();
+          leftColumnY = margin;
+          rightColumnY = margin;
+          useLeftColumn = true;
+        }
+
+        // Renderizar campo
+        const savedY = yPosition;
+        yPosition = currentY;
+        renderFieldSingle(field.key, field.value, field.label, currentX, columnWidth);
+        
+        // Actualizar posición de la columna correspondiente
+        if (useLeftColumn) {
+          leftColumnY = yPosition;
+        } else {
+          rightColumnY = yPosition;
+        }
+        
+        // Alternar columna para el siguiente campo
+        useLeftColumn = !useLeftColumn;
+        
+        // Si terminamos de usar ambas columnas, actualizar yPosition global
+        if (useLeftColumn) {
+          yPosition = Math.max(leftColumnY, rightColumnY);
+        }
+      });
+
+      // Asegurar que yPosition esté en la posición más baja después de dos columnas
+      yPosition = Math.max(leftColumnY, rightColumnY);
+    }
   };
 
   // Log de depuración
