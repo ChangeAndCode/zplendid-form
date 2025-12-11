@@ -1,6 +1,6 @@
 /**
  * Generador de PDF para expedientes médicos
- * Consolida datos del chatbot y formulario tradicional desde MySQL
+ * Consolida datos del chatbot y formulario tradicional desde MongoDB
  * Formato específico para expediente médico
  */
 
@@ -17,7 +17,7 @@ export interface PatientDataForPDF {
   phoneNumber?: string;
   patientId: string;
   
-  // Datos del chatbot (desde tablas MySQL)
+  // Datos del chatbot (desde colecciones MongoDB)
   chatbotData?: {
     patientInfo?: Record<string, unknown>;
     surgeryInterest?: Record<string, unknown>;

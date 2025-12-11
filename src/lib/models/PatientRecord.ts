@@ -1,4 +1,6 @@
-import { getConnection } from '../config/database';
+import { getCollection } from '../config/database';
+import { ObjectId } from 'mongodb';
+import { getUserIdAsObjectId } from '../utils/mongoIdHelper';
 
 export interface PatientRecord {
   id: number;
@@ -13,66 +15,63 @@ export class PatientRecordModel {
    * Crear un nuevo expediente de paciente
    */
   static async create(userId: number, patientId?: string): Promise<PatientRecord> {
-    const connection = await getConnection();
+    const collection = await getCollection<PatientRecord>('patient_records');
     
     // Generar número de expediente único si no se proporciona
     const finalPatientId = patientId || await this.generateUniquePatientId();
 
-    // Insertar el nuevo expediente
-    const [result] = await connection.execute(
-      `INSERT INTO patient_records (patientId, userId, createdAt, updatedAt) 
-       VALUES (?, ?, NOW(), NOW())`,
-      [finalPatientId, userId]
-    );
+    // Convertir userId numérico a ObjectId
+    const userIdValue = await getUserIdAsObjectId(userId);
+    if (!userIdValue) {
+      throw new Error('Usuario no encontrado');
+    }
 
-    const insertResult = result as { insertId: number };
-    const recordId = insertResult.insertId;
+    const now = new Date();
+    const newRecord: any = {
+      patientId: finalPatientId,
+      userId: userIdValue,
+      createdAt: now,
+      updatedAt: now
+    };
 
-    // Obtener el expediente creado
-    const [records] = await connection.execute(
-      'SELECT * FROM patient_records WHERE id = ?',
-      [recordId]
-    );
-
-    const record = (records as PatientRecord[])[0];
-    return record;
+    const result = await collection.insertOne(newRecord);
+    const record = await collection.findOne({ _id: result.insertedId });
+    
+    if (!record) throw new Error('Error al crear expediente');
+    
+    return this.mapFromMongo(record);
   }
 
   /**
    * Obtener expediente por ID de usuario
    */
   static async findByUserId(userId: number): Promise<PatientRecord | null> {
-    const connection = await getConnection();
+    const collection = await getCollection<PatientRecord>('patient_records');
     
-    const [records] = await connection.execute(
-      'SELECT * FROM patient_records WHERE userId = ?',
-      [userId]
-    );
-
-    const recordArray = records as PatientRecord[];
-    return recordArray.length > 0 ? recordArray[0] : null;
+    // Convertir userId numérico a ObjectId
+    const userIdValue = await getUserIdAsObjectId(userId);
+    if (!userIdValue) {
+      return null;
+    }
+    
+    const record = await collection.findOne({ userId: userIdValue });
+    return record ? this.mapFromMongo(record) : null;
   }
 
   /**
    * Obtener expediente por número de paciente
    */
   static async findByPatientId(patientId: string): Promise<PatientRecord | null> {
-    const connection = await getConnection();
-    
-    const [records] = await connection.execute(
-      'SELECT * FROM patient_records WHERE patientId = ?',
-      [patientId]
-    );
-
-    const recordArray = records as PatientRecord[];
-    return recordArray.length > 0 ? recordArray[0] : null;
+    const collection = await getCollection<PatientRecord>('patient_records');
+    const record = await collection.findOne({ patientId });
+    return record ? this.mapFromMongo(record) : null;
   }
 
   /**
    * Generar número de expediente único
    */
   static async generateUniquePatientId(): Promise<string> {
-    const connection = await getConnection();
+    const collection = await getCollection<PatientRecord>('patient_records');
     
     let isUnique = false;
     let patientId: string;
@@ -86,12 +85,9 @@ export class PatientRecordModel {
       patientId = `ZP${year}${month}${randomNum}`;
       
       // Verificar si ya existe
-      const [existing] = await connection.execute(
-        'SELECT id FROM patient_records WHERE patientId = ?',
-        [patientId]
-      );
+      const existing = await collection.findOne({ patientId });
       
-      if (Array.isArray(existing) && existing.length === 0) {
+      if (!existing) {
         isUnique = true;
       }
     }
@@ -100,24 +96,24 @@ export class PatientRecordModel {
   }
 
   /**
-   * Crear tabla de expedientes si no existe
+   * Mapear desde MongoDB a PatientRecord
+   */
+  private static mapFromMongo(record: any): PatientRecord {
+    return {
+      id: record._id ? parseInt(record._id.toString().slice(-8), 16) : record.id,
+      patientId: record.patientId,
+      userId: record.userId instanceof ObjectId ? parseInt(record.userId.toString().slice(-8), 16) : record.userId,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt
+    };
+  }
+
+  /**
+   * Crear índices (equivalente a createTable)
    */
   static async createTable(): Promise<void> {
-    const connection = await getConnection();
-    
-    const createTableQuery = `
-      CREATE TABLE IF NOT EXISTS patient_records (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        patientId VARCHAR(20) UNIQUE NOT NULL,
-        userId INT NOT NULL,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_patientId (patientId),
-        INDEX idx_userId (userId),
-        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `;
-
-    await connection.execute(createTableQuery);
+    const collection = await getCollection<PatientRecord>('patient_records');
+    await collection.createIndex({ patientId: 1 }, { unique: true });
+    await collection.createIndex({ userId: 1 });
   }
 }

@@ -1,5 +1,6 @@
-import { getConnection } from '../config/database';
-import { AutoSchema } from '../utils/autoSchema';
+import { getCollection, getDatabase } from '../config/database';
+import { ObjectId } from 'mongodb';
+import { getUserIdAsObjectId } from '../utils/mongoIdHelper';
 
 // Interfaces para los tipos de datos
 interface PatientRecord {
@@ -83,123 +84,41 @@ export interface DoctorSummary {
 
 export class AdminModel {
   /**
-   * Crear tabla de doctores si no existe
-   */
-  static async createDoctorsTable(): Promise<void> {
-    const connection = await getConnection();
-    
-    try {
-      const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS doctors (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          userId INT NOT NULL,
-          licenseNumber VARCHAR(100) UNIQUE NOT NULL,
-          specialties JSON,
-          isActive BOOLEAN DEFAULT true,
-          isApproved BOOLEAN DEFAULT false,
-          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          INDEX idx_userId (userId),
-          INDEX idx_licenseNumber (licenseNumber),
-          INDEX idx_isApproved (isApproved),
-          FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-      `;
-
-      await connection.execute(createTableQuery);
-      console.log('✅ Tabla doctors verificada/creada');
-    } catch (error) {
-      console.error('❌ Error al crear tabla doctors:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Crear tabla de asignaciones si no existe
-   */
-  static async createAssignmentsTable(): Promise<void> {
-    const connection = await getConnection();
-    
-    try {
-      // Primero asegurar que la tabla doctors existe (para la foreign key)
-      await this.createDoctorsTable();
-      
-      const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS patient_assignments (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          patientId VARCHAR(20) NOT NULL,
-          doctorId INT NOT NULL,
-          interestArea VARCHAR(100) NOT NULL DEFAULT 'No especificado',
-          assignedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          status ENUM('assigned', 'contacted', 'completed') DEFAULT 'assigned',
-          notes TEXT,
-          updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          INDEX idx_patientId (patientId),
-          INDEX idx_doctorId (doctorId),
-          INDEX idx_interestArea (interestArea),
-          INDEX idx_status (status)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-      `;
-
-      await connection.execute(createTableQuery);
-      console.log('✅ Tabla patient_assignments verificada/creada');
-      
-    } catch (error) {
-      console.error('Error al crear/verificar tabla patient_assignments:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Inicializar todas las tablas necesarias para el admin
-   */
-  static async initializeTables(): Promise<void> {
-    await this.createDoctorsTable();
-    await this.createAssignmentsTable();
-  }
-
-  /**
    * Obtener estadísticas generales del panel de administrador
    */
   static async getDashboardStats(): Promise<AdminStats> {
-    const connection = await getConnection();
-    
     try {
-      // Asegurar que las tablas existen
-      await this.createDoctorsTable();
+      const usersCollection = await getCollection('users');
+      const doctorsCollection = await getCollection('doctors');
+      const assignmentsCollection = await getCollection('patient_assignments');
       
       // Total de pacientes (usuarios con rol 'user')
-      const [patientCount] = await connection.execute(
-        `SELECT COUNT(*) as totalPatients 
-         FROM users 
-         WHERE role = 'user' AND isActive = true`
-      );
+      const totalPatients = await usersCollection.countDocuments({ 
+        role: 'user', 
+        isActive: true 
+      });
       
-      // Doctores activos (de la tabla doctors)
-      const [doctorCount] = await connection.execute(
-        `SELECT COUNT(*) as activeDoctors 
-         FROM doctors 
-         WHERE isApproved = true`
-      );
+      // Doctores activos
+      const activeDoctors = await doctorsCollection.countDocuments({ 
+        isApproved: true 
+      });
       
-      // Solicitudes pendientes (doctores con estado pendiente)
-      const [pendingCount] = await connection.execute(
-        `SELECT COUNT(*) as pendingRequests 
-         FROM doctors 
-         WHERE isApproved = false`
-      );
+      // Solicitudes pendientes
+      const pendingRequests = await doctorsCollection.countDocuments({ 
+        isApproved: false 
+      });
       
-      // Asignaciones de hoy (esto se implementará cuando tengamos la tabla de asignaciones)
-      const todaysAssignments = 0; // Por ahora 0, se implementará después
-      
-      const patientResult = patientCount as { totalPatients: number }[];
-      const doctorResult = doctorCount as { activeDoctors: number }[];
-      const pendingResult = pendingCount as { pendingRequests: number }[];
+      // Asignaciones de hoy
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todaysAssignments = await assignmentsCollection.countDocuments({
+        assignedAt: { $gte: today }
+      });
       
       return {
-        totalPatients: patientResult[0]?.totalPatients || 0,
-        activeDoctors: doctorResult[0]?.activeDoctors || 0,
-        pendingRequests: pendingResult[0]?.pendingRequests || 0,
+        totalPatients,
+        activeDoctors,
+        pendingRequests,
         todaysAssignments
       };
     } catch (error) {
@@ -212,39 +131,49 @@ export class AdminModel {
    * Obtener lista de pacientes con información resumida
    */
   static async getPatientsList(): Promise<PatientSummary[]> {
-    const connection = await getConnection();
-    
     try {
-      const [patients] = await connection.execute(
-        `SELECT 
-           u.id,
-           COALESCE(pr.patientId, 'Sin ID') as patientId,
-           u.firstName,
-           u.lastName,
-           u.email,
-           u.createdAt,
-           'No especificado' as interestArea,
-           CASE 
-             WHEN pr.patientId IS NOT NULL THEN 'in_progress'
-             ELSE 'registered'
-           END as status
-         FROM users u
-         LEFT JOIN patient_records pr ON u.id = pr.userId
-         WHERE u.role = 'user' AND u.isActive = true
-         ORDER BY u.createdAt DESC`
-      );
+      const db = await getDatabase();
       
-      const patientsArray = patients as PatientRecord[];
+      const patients = await db.collection('users').aggregate([
+        { $match: { role: 'user', isActive: true } },
+        {
+          $lookup: {
+            from: 'patient_records',
+            localField: '_id',
+            foreignField: 'userId',
+            as: 'patientRecord'
+          }
+        },
+        {
+          $project: {
+            id: { $ifNull: [{ $toInt: { $substr: ['$_id', -8, 8] } }, '$_id'] },
+            patientId: { $ifNull: [{ $arrayElemAt: ['$patientRecord.patientId', 0] }, 'Sin ID'] },
+            firstName: 1,
+            lastName: 1,
+            email: 1,
+            createdAt: 1,
+            interestArea: 'No especificado',
+            status: {
+              $cond: {
+                if: { $gt: [{ $size: '$patientRecord' }, 0] },
+                then: 'in_progress',
+                else: 'registered'
+              }
+            }
+          }
+        },
+        { $sort: { createdAt: -1 } }
+      ]).toArray();
       
-      return patientsArray.map(patient => ({
-        id: patient.id,
-        patientId: patient.patientId || '',
-        firstName: patient.firstName,
-        lastName: patient.lastName,
-        email: patient.email,
-        interestArea: patient.interestArea || 'No especificado',
-        status: (patient.status as 'complete' | 'in_progress' | 'assigned') || 'registered',
-        createdAt: patient.createdAt
+      return patients.map((p: any) => ({
+        id: p._id ? parseInt(p._id.toString().slice(-8), 16) : (p.id || 0),
+        patientId: p.patientId || '',
+        firstName: p.firstName,
+        lastName: p.lastName,
+        email: p.email,
+        interestArea: p.interestArea || 'No especificado',
+        status: (p.status as 'complete' | 'in_progress' | 'assigned') || 'registered',
+        createdAt: p.createdAt
       }));
     } catch (error) {
       console.error('Error al obtener lista de pacientes:', error);
@@ -256,38 +185,44 @@ export class AdminModel {
    * Obtener lista de doctores con información resumida
    */
   static async getDoctorsList(): Promise<DoctorSummary[]> {
-    const connection = await getConnection();
-    
     try {
-      // Asegurar que la tabla existe
-      await this.createDoctorsTable();
+      const db = await getDatabase();
       
-      const [doctors] = await connection.execute(
-        `SELECT 
-           d.id,
-           d.userId,
-           d.licenseNumber,
-           d.specialties,
-           d.isActive,
-           d.isApproved,
-           u.firstName,
-           u.lastName,
-           u.email,
-           d.createdAt,
-           CASE 
-             WHEN d.isApproved = true THEN 'approved'
-             WHEN d.isApproved = false THEN 'pending'
-             ELSE 'pending'
-           END as status
-         FROM doctors d
-         INNER JOIN users u ON d.userId = u.id
-         ORDER BY d.createdAt DESC`
-      );
+      const doctors = await db.collection('doctors').aggregate([
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'user'
+          }
+        },
+        { $unwind: '$user' },
+        {
+          $project: {
+            id: { $ifNull: [{ $toInt: { $substr: ['$_id', -8, 8] } }, '$_id'] },
+            userId: 1,
+            licenseNumber: 1,
+            specialties: 1,
+            isActive: 1,
+            isApproved: 1,
+            firstName: '$user.firstName',
+            lastName: '$user.lastName',
+            email: '$user.email',
+            createdAt: 1,
+            status: {
+              $cond: {
+                if: '$isApproved',
+                then: 'approved',
+                else: 'pending'
+              }
+            }
+          }
+        },
+        { $sort: { createdAt: -1 } }
+      ]).toArray();
       
-      const doctorsArray = doctors as DoctorRecord[];
-      
-      return doctorsArray.map(doctor => {
-        // Parsear las especialidades desde JSON
+      return doctors.map((doctor: any) => {
         let specialtyText = 'Sin especialidades';
         try {
           const specialties = typeof doctor.specialties === 'string' 
@@ -296,13 +231,15 @@ export class AdminModel {
           
           if (Array.isArray(specialties) && specialties.length > 0) {
             specialtyText = specialties.join(', ');
+          } else if (doctor.specialties) {
+            specialtyText = String(doctor.specialties);
           }
         } catch {
           specialtyText = doctor.specialties || 'Sin especialidades';
         }
 
         return {
-          id: doctor.id,
+          id: doctor._id ? parseInt(doctor._id.toString().slice(-8), 16) : (doctor.id || 0),
           firstName: doctor.firstName || '',
           lastName: doctor.lastName || '',
           email: doctor.email || '',
@@ -321,16 +258,25 @@ export class AdminModel {
    * Aprobar un doctor
    */
   static async approveDoctor(doctorId: number): Promise<void> {
-    const connection = await getConnection();
+    const collection = await getCollection('doctors');
     
     try {
-      // Asegurar que la tabla existe
-      await this.createDoctorsTable();
+      // Buscar doctor por id numérico
+      const doctors = await collection.find({}).toArray();
+      const doctor = doctors.find((d: any) => {
+        if (d._id) {
+          const numericId = parseInt(d._id.toString().slice(-8), 16);
+          return numericId === doctorId;
+        }
+        return (d as any).id === doctorId;
+      });
       
-      await connection.execute(
-        'UPDATE doctors SET isApproved = true, updatedAt = NOW() WHERE id = ?',
-        [doctorId]
-      );
+      if (doctor && doctor._id) {
+        await collection.updateOne(
+          { _id: doctor._id },
+          { $set: { isApproved: true, updatedAt: new Date() } }
+        );
+      }
     } catch (error) {
       console.error('Error al aprobar doctor:', error);
       throw error;
@@ -341,16 +287,25 @@ export class AdminModel {
    * Rechazar un doctor
    */
   static async rejectDoctor(doctorId: number): Promise<void> {
-    const connection = await getConnection();
+    const collection = await getCollection('doctors');
     
     try {
-      // Asegurar que la tabla existe
-      await this.createDoctorsTable();
+      // Buscar doctor por id numérico
+      const doctors = await collection.find({}).toArray();
+      const doctor = doctors.find((d: any) => {
+        if (d._id) {
+          const numericId = parseInt(d._id.toString().slice(-8), 16);
+          return numericId === doctorId;
+        }
+        return (d as any).id === doctorId;
+      });
       
-      await connection.execute(
-        'UPDATE doctors SET isApproved = false, updatedAt = NOW() WHERE id = ?',
-        [doctorId]
-      );
+      if (doctor && doctor._id) {
+        await collection.updateOne(
+          { _id: doctor._id },
+          { $set: { isApproved: false, updatedAt: new Date() } }
+        );
+      }
     } catch (error) {
       console.error('Error al rechazar doctor:', error);
       throw error;
@@ -370,46 +325,47 @@ export class AdminModel {
       familyHistory?: Record<string, unknown>;
     };
   }) | null> {
-    const connection = await getConnection();
-    
     try {
-      // Obtener información básica del paciente
-      const [patientInfo] = await connection.execute(
-        `SELECT 
-           u.id,
-           u.firstName,
-           u.lastName,
-           u.email,
-           pr.patientId,
-           u.createdAt
-         FROM users u
-         INNER JOIN patient_records pr ON u.id = pr.userId
-         WHERE pr.patientId = ? AND u.role = 'user'`,
-        [patientId]
-      );
+      const db = await getDatabase();
       
-      if (!Array.isArray(patientInfo) || patientInfo.length === 0) {
+      // Obtener información básica del paciente
+      const patientRecords = await db.collection('patient_records').aggregate([
+        { $match: { patientId } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'user'
+          }
+        },
+        { $unwind: '$user' },
+        { $match: { 'user.role': 'user' } }
+      ]).toArray();
+      
+      if (!patientRecords || patientRecords.length === 0) {
         return null;
       }
       
-      const patient = patientInfo[0] as PatientRecord;
+      const pr = patientRecords[0] as any;
+      const patient: PatientRecord = {
+        id: pr._id ? parseInt(pr._id.toString().slice(-8), 16) : pr.id,
+        patientId: pr.patientId,
+        userId: pr.userId instanceof ObjectId ? parseInt(pr.userId.toString().slice(-8), 16) : pr.userId,
+        createdAt: pr.createdAt,
+        updatedAt: pr.updatedAt
+      };
       
       // Obtener datos de formularios tradicionales
-      const [formData] = await connection.execute(
-        `SELECT formType, formData 
-         FROM patient_form_data 
-         WHERE patientId = ?`,
-        [patientId]
-      );
-      
-      const forms = formData as { formType: string; formData: Record<string, unknown> }[];
+      const formDataCollection = await getCollection('patient_form_data');
+      const forms = await formDataCollection.find({ patientId }).toArray();
       const formDataMap: Record<string, Record<string, unknown>> = {};
       
-      forms.forEach(form => {
+      forms.forEach((form: any) => {
         formDataMap[form.formType] = form.formData;
       });
 
-      // Obtener datos del chatbot desde las tablas estructuradas
+      // Obtener datos del chatbot desde las colecciones estructuradas
       const chatbotData: {
         patientInfo?: Record<string, unknown>;
         surgeryInterest?: Record<string, unknown>;
@@ -418,81 +374,29 @@ export class AdminModel {
       } = {};
 
       // Obtener medicalRecordId
-      const [medicalRecords] = await connection.execute(
-        `SELECT mr.id FROM medical_records mr
-         INNER JOIN patient_records pr ON mr.recordNumber = pr.patientId
-         WHERE pr.patientId = ? LIMIT 1`,
-        [patientId]
-      );
+      const medicalRecords = await db.collection('medical_records')
+        .find({ recordNumber: patientId })
+        .limit(1)
+        .toArray();
 
-      if (Array.isArray(medicalRecords) && medicalRecords.length > 0) {
-        const medicalRecordId = (medicalRecords[0] as { id: number }).id;
+      if (medicalRecords && medicalRecords.length > 0) {
+        const medicalRecordId = medicalRecords[0]._id;
 
-        // Asegurar que las tablas existan antes de intentar leerlas
-        await AutoSchema.ensurePatientInfoColumns();
-        await AutoSchema.ensureSurgeryInterestColumns();
-        await AutoSchema.ensureMedicalHistoryColumns();
-        await AutoSchema.ensureFamilyHistoryColumns();
-
-        // Obtener patient_info
-        try {
-          const [patientInfoData] = await connection.execute(
-            `SELECT * FROM patient_info WHERE medicalRecordId = ? LIMIT 1`,
-            [medicalRecordId]
-          );
-          if (Array.isArray(patientInfoData) && patientInfoData.length > 0) {
-            const data = patientInfoData[0] as Record<string, unknown>;
-            // Remover campos internos
-            const { id, medicalRecordId: _, createdAt: __, updatedAt: ___, ...cleanData } = data;
-            chatbotData.patientInfo = cleanData;
+        // Obtener datos de las colecciones dinámicas
+        const collections = ['patient_info', 'surgery_interest', 'medical_history', 'family_history'];
+        const dataKeys = ['patientInfo', 'surgeryInterest', 'medicalHistory', 'familyHistory'];
+        
+        for (let i = 0; i < collections.length; i++) {
+          try {
+            const collection = await getCollection(collections[i]);
+            const data = await collection.findOne({ medicalRecordId });
+            if (data) {
+              const { _id, medicalRecordId: _, createdAt, updatedAt, ...cleanData } = data as any;
+              (chatbotData as any)[dataKeys[i]] = cleanData;
+            }
+          } catch (error) {
+            console.warn(`Error al obtener ${collections[i]}:`, error);
           }
-        } catch (error) {
-          console.warn('Error al obtener patient_info (tabla puede no existir aún):', error);
-        }
-
-        // Obtener surgery_interest
-        try {
-          const [surgeryInterestData] = await connection.execute(
-            `SELECT * FROM surgery_interest WHERE medicalRecordId = ? LIMIT 1`,
-            [medicalRecordId]
-          );
-          if (Array.isArray(surgeryInterestData) && surgeryInterestData.length > 0) {
-            const data = surgeryInterestData[0] as Record<string, unknown>;
-            const { id, medicalRecordId: _, createdAt: __, updatedAt: ___, ...cleanData } = data;
-            chatbotData.surgeryInterest = cleanData;
-          }
-        } catch (error) {
-          console.warn('Error al obtener surgery_interest (tabla puede no existir aún):', error);
-        }
-
-        // Obtener medical_history
-        try {
-          const [medicalHistoryData] = await connection.execute(
-            `SELECT * FROM medical_history WHERE medicalRecordId = ? LIMIT 1`,
-            [medicalRecordId]
-          );
-          if (Array.isArray(medicalHistoryData) && medicalHistoryData.length > 0) {
-            const data = medicalHistoryData[0] as Record<string, unknown>;
-            const { id, medicalRecordId: _, createdAt: __, updatedAt: ___, ...cleanData } = data;
-            chatbotData.medicalHistory = cleanData;
-          }
-        } catch (error) {
-          console.warn('Error al obtener medical_history (tabla puede no existir aún):', error);
-        }
-
-        // Obtener family_history
-        try {
-          const [familyHistoryData] = await connection.execute(
-            `SELECT * FROM family_history WHERE medicalRecordId = ? LIMIT 1`,
-            [medicalRecordId]
-          );
-          if (Array.isArray(familyHistoryData) && familyHistoryData.length > 0) {
-            const data = familyHistoryData[0] as Record<string, unknown>;
-            const { id, medicalRecordId: _, createdAt: __, updatedAt: ___, ...cleanData } = data;
-            chatbotData.familyHistory = cleanData;
-          }
-        } catch (error) {
-          console.warn('Error al obtener family_history (tabla puede no existir aún):', error);
         }
       }
       
@@ -508,75 +412,84 @@ export class AdminModel {
   }
 
   /**
-   * Crear tabla de asignaciones si no existe
+   * Crear índices de asignaciones (equivalente a createTable)
    */
   static async createAssignmentsTable(): Promise<void> {
-    const connection = await getConnection();
-    
-    try {
-      // Crear la tabla solo si no existe, sin foreign keys por ahora
-      const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS patient_assignments (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          patientId VARCHAR(20) NOT NULL,
-          doctorId INT NOT NULL,
-          interestArea VARCHAR(100) NOT NULL DEFAULT 'No especificado',
-          assignedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          status ENUM('assigned', 'contacted', 'completed') DEFAULT 'assigned',
-          notes TEXT,
-          INDEX idx_patientId (patientId),
-          INDEX idx_doctorId (doctorId),
-          INDEX idx_interestArea (interestArea)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-      `;
-
-      await connection.execute(createTableQuery);
-      console.log('✅ Tabla patient_assignments verificada/creada');
-      
-    } catch (error) {
-      console.error('Error al crear/verificar tabla patient_assignments:', error);
-      throw error;
-    }
+    const collection = await getCollection('patient_assignments');
+    await collection.createIndex({ patientId: 1 });
+    await collection.createIndex({ doctorId: 1 });
+    await collection.createIndex({ interestArea: 1 });
+    console.log('✅ Índices de patient_assignments verificados/creados');
   }
 
   /**
    * Obtener historial de asignaciones
    */
   static async getAssignmentsHistory(): Promise<AssignmentRecord[]> {
-    const connection = await getConnection();
-    
     try {
-      // Asegurar que las tablas existen
-      await this.createDoctorsTable();
       await this.createAssignmentsTable();
+      const db = await getDatabase();
       
-      const [assignments] = await connection.execute(
-        `SELECT 
-           pa.id,
-           pa.patientId,
-           pa.interestArea,
-           pa.assignedAt,
-           pa.status,
-           pa.notes,
-           u.firstName as patientFirstName,
-           u.lastName as patientLastName,
-           u.email as patientEmail,
-           d.userId as doctorUserId,
-           du.firstName as doctorFirstName,
-           du.lastName as doctorLastName,
-           du.email as doctorEmail
-         FROM patient_assignments pa
-         INNER JOIN patient_records pr ON pa.patientId = pr.patientId
-         INNER JOIN users u ON pr.userId = u.id
-         INNER JOIN doctors d ON pa.doctorId = d.id
-         INNER JOIN users du ON d.userId = du.id
-         ORDER BY pa.assignedAt DESC`
-      );
+      const assignments = await db.collection('patient_assignments').aggregate([
+        {
+          $lookup: {
+            from: 'patient_records',
+            localField: 'patientId',
+            foreignField: 'patientId',
+            as: 'patientRecord'
+          }
+        },
+        { $unwind: '$patientRecord' },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'patientRecord.userId',
+            foreignField: '_id',
+            as: 'patientUser'
+          }
+        },
+        { $unwind: '$patientUser' },
+        {
+          $lookup: {
+            from: 'doctors',
+            localField: 'doctorId',
+            foreignField: '_id',
+            as: 'doctor'
+          }
+        },
+        { $unwind: '$doctor' },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'doctor.userId',
+            foreignField: '_id',
+            as: 'doctorUser'
+          }
+        },
+        { $unwind: '$doctorUser' },
+        {
+          $project: {
+            id: { $ifNull: [{ $toInt: { $substr: ['$_id', -8, 8] } }, '$_id'] },
+            patientId: 1,
+            interestArea: 1,
+            assignedAt: 1,
+            status: 1,
+            notes: 1,
+            patientFirstName: '$patientUser.firstName',
+            patientLastName: '$patientUser.lastName',
+            patientEmail: '$patientUser.email',
+            doctorUserId: '$doctor.userId',
+            doctorFirstName: '$doctorUser.firstName',
+            doctorLastName: '$doctorUser.lastName',
+            doctorEmail: '$doctorUser.email'
+          }
+        },
+        { $sort: { assignedAt: -1 } }
+      ]).toArray();
       
       return assignments as AssignmentRecord[];
     } catch (error) {
       console.error('Error al obtener historial de asignaciones:', error);
-      // Si hay error, devolver array vacío
       return [];
     }
   }
@@ -589,49 +502,50 @@ export class AdminModel {
     doctorId: number,
     interestArea: string
   ): Promise<void> {
-    const connection = await getConnection();
+    const collection = await getCollection('patient_assignments');
     
     try {
-      console.log('🔍 Iniciando asignación con:', { patientId, doctorId, interestArea });
-      
-      // Asegurar que la tabla existe
       await this.createAssignmentsTable();
-      console.log('✅ Tabla verificada/creada');
       
-      // Verificar si ya existe una asignación
-      console.log('🔍 Buscando asignación existente para patientId:', patientId);
-      const [existing] = await connection.execute(
-        'SELECT id FROM patient_assignments WHERE patientId = ?',
-        [patientId]
-      );
+      // Convertir doctorId numérico a ObjectId
+      const doctorsCollection = await getCollection('doctors');
+      const doctors = await doctorsCollection.find({}).toArray();
+      const doctor = doctors.find((d: any) => {
+        if (d._id) {
+          const numericId = parseInt(d._id.toString().slice(-8), 16);
+          return numericId === doctorId;
+        }
+        return (d as any).id === doctorId;
+      });
       
-      console.log('🔍 Resultado de búsqueda:', existing);
-      console.log('🔍 Es array?', Array.isArray(existing));
-      console.log('🔍 Longitud:', Array.isArray(existing) ? existing.length : 'N/A');
+      if (!doctor || !doctor._id) {
+        throw new Error('Doctor no encontrado');
+      }
       
-      if (Array.isArray(existing) && existing.length > 0) {
-        // Actualizar asignación existente
-        console.log('📝 Actualizando asignación existente para patientId:', patientId);
-        await connection.execute(
-          'UPDATE patient_assignments SET doctorId = ?, interestArea = ?, assignedAt = NOW(), status = "assigned" WHERE patientId = ?',
-          [doctorId, interestArea, patientId]
+      const doctorIdValue = doctor._id;
+      const existing = await collection.findOne({ patientId });
+      
+      if (existing) {
+        await collection.updateOne(
+          { patientId },
+          {
+            $set: {
+              doctorId: doctorIdValue,
+              interestArea,
+              status: 'assigned',
+              assignedAt: new Date()
+            }
+          }
         );
-        console.log('✅ Asignación actualizada exitosamente');
       } else {
-        // Crear nueva asignación
-        console.log('➕ Creando nueva asignación para patientId:', patientId, 'doctorId:', doctorId, 'interestArea:', interestArea);
-        const [result] = await connection.execute(
-          'INSERT INTO patient_assignments (patientId, doctorId, interestArea, status) VALUES (?, ?, ?, "assigned")',
-          [patientId, doctorId, interestArea]
-        );
-        console.log('✅ Nueva asignación creada exitosamente. Resultado:', result);
-        
-        // Verificar que se insertó
-        const [verification] = await connection.execute(
-          'SELECT * FROM patient_assignments WHERE patientId = ?',
-          [patientId]
-        );
-        console.log('🔍 Verificación de inserción:', verification);
+        await collection.insertOne({
+          patientId,
+          doctorId: doctorIdValue,
+          interestArea,
+          status: 'assigned',
+          assignedAt: new Date(),
+          notes: null
+        });
       }
     } catch (error) {
       console.error('❌ Error al asignar paciente a doctor:', error);
@@ -643,19 +557,44 @@ export class AdminModel {
    * Obtener doctores por especialidad
    */
   static async getDoctorsBySpecialty(specialty: string): Promise<DoctorRecord[]> {
-    const connection = await getConnection();
-    
     try {
-      // Asegurar que la tabla existe
-      await this.createDoctorsTable();
+      const db = await getDatabase();
       
-      const [doctors] = await connection.execute(
-        `SELECT d.*, u.firstName, u.lastName, u.email
-         FROM doctors d
-         INNER JOIN users u ON d.userId = u.id
-         WHERE d.specialties LIKE ? AND d.isApproved = true AND d.isActive = true`,
-        [`%${specialty}%`]
-      );
+      const doctors = await db.collection('doctors').aggregate([
+        {
+          $match: {
+            isApproved: true,
+            isActive: true,
+            $or: [
+              { specialties: { $regex: specialty, $options: 'i' } },
+              { specialties: { $elemMatch: { $regex: specialty, $options: 'i' } } }
+            ]
+          }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'user'
+          }
+        },
+        { $unwind: '$user' },
+        {
+          $project: {
+            _id: 1,
+            id: { $ifNull: [{ $toInt: { $substr: ['$_id', -8, 8] } }, '$_id'] },
+            userId: 1,
+            licenseNumber: 1,
+            specialties: 1,
+            isActive: 1,
+            isApproved: 1,
+            firstName: '$user.firstName',
+            lastName: '$user.lastName',
+            email: '$user.email'
+          }
+        }
+      ]).toArray();
       
       return doctors as DoctorRecord[];
     } catch (error) {
@@ -668,87 +607,63 @@ export class AdminModel {
    * Buscar pacientes según tipo y valor
    */
   static async searchPatients(searchType: string, searchValue: string): Promise<SearchResult[]> {
-    const connection = await getConnection();
-    
     try {
-      let query = '';
-      let params: unknown[] = [];
+      const db = await getDatabase();
+      
+      let matchStage: any = {
+        role: 'user',
+        isActive: true
+      };
 
       if (searchType === 'expediente') {
-        // Buscar por número de expediente
-        query = `
-          SELECT 
-            u.id,
-            COALESCE(pr.patientId, 'Sin ID') as patientId,
-            u.firstName,
-            u.lastName,
-            u.email,
-            u.createdAt,
-            'No especificado' as interestArea,
-            CASE 
-              WHEN pr.patientId IS NOT NULL THEN 'in_progress'
-              ELSE 'registered'
-            END as status
-          FROM users u
-          LEFT JOIN patient_records pr ON u.id = pr.userId
-          WHERE u.role = 'user' 
-            AND u.isActive = true 
-            AND pr.patientId IS NOT NULL
-            AND pr.patientId LIKE ?
-          ORDER BY u.createdAt DESC
-        `;
-        params = [`%${searchValue}%`];
+        // Buscar por número de expediente - necesitamos buscar en patient_records primero
+        const patientRecords = await db.collection('patient_records')
+          .find({ patientId: { $regex: searchValue, $options: 'i' } })
+          .toArray();
+        
+        if (patientRecords.length === 0) return [];
+        
+        const userIds = patientRecords.map(pr => pr.userId);
+        matchStage._id = { $in: userIds };
       } else if (searchType === 'nombre') {
-        // Buscar por nombre del paciente
-        query = `
-          SELECT 
-            u.id,
-            COALESCE(pr.patientId, 'Sin ID') as patientId,
-            u.firstName,
-            u.lastName,
-            u.email,
-            u.createdAt,
-            'No especificado' as interestArea,
-            CASE 
-              WHEN pr.patientId IS NOT NULL THEN 'in_progress'
-              ELSE 'registered'
-            END as status
-          FROM users u
-          LEFT JOIN patient_records pr ON u.id = pr.userId
-          WHERE u.role = 'user' 
-            AND u.isActive = true 
-            AND (u.firstName LIKE ? OR u.lastName LIKE ?)
-          ORDER BY u.createdAt DESC
-        `;
-        params = [`%${searchValue}%`, `%${searchValue}%`];
+        // Buscar por nombre
+        matchStage.$or = [
+          { firstName: { $regex: searchValue, $options: 'i' } },
+          { lastName: { $regex: searchValue, $options: 'i' } }
+        ];
       } else if (searchType === 'procedimiento') {
-        // Buscar por área de interés/procedimiento - simplificar para evitar errores con JSON
-        query = `
-          SELECT 
-            u.id,
-            COALESCE(pr.patientId, 'Sin ID') as patientId,
-            u.firstName,
-            u.lastName,
-            u.email,
-            u.createdAt,
-            'No especificado' as interestArea,
-            CASE 
-              WHEN pr.patientId IS NOT NULL THEN 'in_progress'
-              ELSE 'registered'
-            END as status
-          FROM users u
-          LEFT JOIN patient_records pr ON u.id = pr.userId
-          WHERE u.role = 'user' 
-            AND u.isActive = true 
-            AND pr.patientId IS NOT NULL
-          ORDER BY u.createdAt DESC
-        `;
-        params = [];
+        // Buscar pacientes con expediente (todos los que tienen patient_records)
+        const patientRecords = await db.collection('patient_records').find({}).toArray();
+        if (patientRecords.length === 0) return [];
+        const userIds = patientRecords.map(pr => pr.userId);
+        matchStage._id = { $in: userIds };
       } else {
         return [];
       }
 
-      const [results] = await connection.execute(query, params);
+      const results = await db.collection('users').aggregate([
+        { $match: matchStage },
+        {
+          $lookup: {
+            from: 'patient_records',
+            localField: '_id',
+            foreignField: 'userId',
+            as: 'patientRecord'
+          }
+        },
+        {
+          $project: {
+            id: { $ifNull: [{ $toInt: { $substr: ['$_id', -8, 8] } }, '$_id'] },
+            patientId: { $ifNull: [{ $arrayElemAt: ['$patientRecord.patientId', 0] }, 'Sin ID'] },
+            firstName: 1,
+            lastName: 1,
+            email: 1,
+            createdAt: 1,
+            interestArea: 'No especificado'
+          }
+        },
+        { $sort: { createdAt: -1 } }
+      ]).toArray();
       
       return results as SearchResult[];
     } catch (error) {

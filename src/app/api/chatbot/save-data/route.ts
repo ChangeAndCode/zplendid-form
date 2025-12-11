@@ -1,5 +1,5 @@
 /**
- * API endpoint para guardar datos del chatbot en MySQL
+ * API endpoint para guardar datos del chatbot en MongoDB
  * NO modifica código existente - nueva funcionalidad para chatbot
  */
 
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json(
     {
-      message: 'Endpoint para guardar datos del chatbot en MySQL',
+      message: 'Endpoint para guardar datos del chatbot en MongoDB',
       method: 'POST',
       status: 'active',
       description: 'Guarda datos extraídos del chatbot en las mismas tablas que usa el formulario tradicional'

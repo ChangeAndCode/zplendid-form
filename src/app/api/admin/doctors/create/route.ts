@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConnection } from '../../../../../lib/config/database';
+import { getCollection } from '../../../../../lib/config/database';
+import { ObjectId } from 'mongodb';
 import { JWTUtils } from '../../../../../lib/utils/jwt';
 import { EmailService } from '../../../../../lib/utils/email';
 import bcrypt from 'bcryptjs';
@@ -37,47 +38,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const connection = await getConnection();
+    const usersCollection = await getCollection('users');
+    const doctorsCollection = await getCollection('doctors');
 
     // Verificar si el email ya existe
-    const [existingUser] = await connection.execute(
-      'SELECT id FROM users WHERE email = ?',
-      [email]
-    );
-
-    if (Array.isArray(existingUser) && existingUser.length > 0) {
+    const existingUser = await usersCollection.findOne({ email });
+    if (existingUser) {
       return NextResponse.json(
         { success: false, message: 'El email ya está registrado en el sistema' },
         { status: 400 }
       );
     }
 
-    // 1. Crear usuario en la tabla users
+    // 1. Crear usuario
     const hashedPassword = await bcrypt.hash(password, 12);
+    const now = new Date();
+    
+    const newUser = {
+      email,
+      password: hashedPassword,
+      firstName,
+      lastName,
+      role: 'doctor',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    };
 
-    const [userResult] = await connection.execute(
-      `INSERT INTO users (email, password, firstName, lastName, role, isActive, createdAt, updatedAt) 
-       VALUES (?, ?, ?, ?, 'doctor', true, NOW(), NOW())`,
-      [email, hashedPassword, firstName, lastName]
-    );
-
-    interface InsertResult {
-      insertId: number;
-    }
-    const userId = (userResult as InsertResult).insertId;
+    const userResult = await usersCollection.insertOne(newUser);
+    const userId = userResult.insertedId;
 
     // 2. Crear registro en la tabla doctors
-    // Convertir specialties a JSON si no lo es
-    let specialtiesJson = specialties;
+    // Convertir specialties a array si es string
+    let specialtiesArray = specialties;
     if (typeof specialties === 'string') {
-      specialtiesJson = JSON.stringify([specialties]);
+      specialtiesArray = [specialties];
     }
 
-    await connection.execute(
-      `INSERT INTO doctors (userId, licenseNumber, specialties, isActive, isApproved, createdAt, updatedAt) 
-       VALUES (?, ?, ?, false, false, NOW(), NOW())`,
-      [userId, licenseNumber, specialtiesJson]
-    );
+    await doctorsCollection.insertOne({
+      userId,
+      licenseNumber,
+      specialties: specialtiesArray,
+      isActive: false,
+      isApproved: false,
+      createdAt: now,
+      updatedAt: now
+    });
 
     // Enviar email de bienvenida al doctor
     const emailSent = await EmailService.sendWelcomeEmailToDoctor(

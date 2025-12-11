@@ -33,24 +33,10 @@ export async function GET(request: NextRequest) {
       data: stats
     }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error al obtener estadísticas del dashboard:', error);
-    const errorMessage = error?.message || 'Error interno del servidor';
-    const errorCode = error?.code || 'UNKNOWN_ERROR';
-    
-    console.error('Detalles del error:', {
-      message: errorMessage,
-      code: errorCode,
-      stack: error?.stack
-    });
-    
     return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Error interno del servidor',
-        error: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
-        code: process.env.NODE_ENV === 'development' ? errorCode : undefined
-      },
+      { success: false, message: 'Error interno del servidor' },
       { status: 500 }
     );
   }

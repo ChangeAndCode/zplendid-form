@@ -1,7 +1,16 @@
-import { getConnection } from '../config/database';
+import { getCollection } from '../config/database';
 
 export interface SystemSettings {
   id: number;
+  settingKey: string;
+  settingValue: string;
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface SystemSettingsDoc {
+  _id?: any;
   settingKey: string;
   settingValue: string;
   description?: string;
@@ -14,16 +23,11 @@ export class SystemSettingsModel {
    * Obtener valor de configuración
    */
   static async getSetting(key: string): Promise<string | null> {
-    const connection = await getConnection();
+    const collection = await getCollection<SystemSettingsDoc>('system_settings');
     
     try {
-      const [settings] = await connection.execute(
-        'SELECT settingValue FROM system_settings WHERE settingKey = ?',
-        [key]
-      );
-      
-      const settingsArray = settings as SystemSettings[];
-      return settingsArray.length > 0 ? settingsArray[0].settingValue : null;
+      const setting = await collection.findOne({ settingKey: key });
+      return setting ? setting.settingValue : null;
     } catch (error) {
       console.error(`Error al obtener configuración ${key}:`, error);
       return null;
@@ -34,28 +38,25 @@ export class SystemSettingsModel {
    * Guardar o actualizar valor de configuración
    */
   static async setSetting(key: string, value: string, description?: string): Promise<void> {
-    const connection = await getConnection();
+    const collection = await getCollection<SystemSettingsDoc>('system_settings');
     
     try {
-      // Verificar si existe
-      const [existing] = await connection.execute(
-        'SELECT id FROM system_settings WHERE settingKey = ?',
-        [key]
+      const now = new Date();
+      await collection.updateOne(
+        { settingKey: key },
+        {
+          $set: {
+            settingKey: key,
+            settingValue: value,
+            description,
+            updatedAt: now
+          },
+          $setOnInsert: {
+            createdAt: now
+          }
+        },
+        { upsert: true }
       );
-      
-      if (Array.isArray(existing) && existing.length > 0) {
-        // Actualizar
-        await connection.execute(
-          'UPDATE system_settings SET settingValue = ?, updatedAt = NOW() WHERE settingKey = ?',
-          [value, key]
-        );
-      } else {
-        // Crear
-        await connection.execute(
-          'INSERT INTO system_settings (settingKey, settingValue, description, createdAt, updatedAt) VALUES (?, ?, ?, NOW(), NOW())',
-          [key, value, description]
-        );
-      }
     } catch (error) {
       console.error(`Error al guardar configuración ${key}:`, error);
       throw error;
@@ -66,27 +67,18 @@ export class SystemSettingsModel {
    * Obtener todas las configuraciones
    */
   static async getAllSettings(): Promise<Record<string, string>> {
-    const connection = await getConnection();
+    const collection = await getCollection<SystemSettingsDoc>('system_settings');
     
     try {
-      const [settings] = await connection.execute(
-        'SELECT settingKey, settingValue FROM system_settings'
-      );
-      
-      const settingsArray = settings as SystemSettings[];
+      const settings = await collection.find({}).toArray();
       const result: Record<string, string> = {};
       
-      settingsArray.forEach(setting => {
+      settings.forEach(setting => {
         result[setting.settingKey] = setting.settingValue;
       });
       
       return result;
     } catch (error: any) {
-      // Si la tabla no existe, simplemente retornar objeto vacío (se usará fallback de variables de entorno)
-      if (error?.code === 'ER_NO_SUCH_TABLE') {
-        return {};
-      }
-      // Para otros errores, loguear pero no fallar
       console.error('Error al obtener todas las configuraciones:', error);
       return {};
     }
@@ -132,24 +124,11 @@ export class SystemSettingsModel {
   }
 
   /**
-   * Crear tabla de configuración del sistema
+   * Crear índices (equivalente a createTable)
    */
   static async createTable(): Promise<void> {
-    const connection = await getConnection();
-    
-    const createTableQuery = `
-      CREATE TABLE IF NOT EXISTS system_settings (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        settingKey VARCHAR(100) UNIQUE NOT NULL,
-        settingValue TEXT NOT NULL,
-        description VARCHAR(255),
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_settingKey (settingKey)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `;
-
-    await connection.execute(createTableQuery);
+    const collection = await getCollection<SystemSettingsDoc>('system_settings');
+    await collection.createIndex({ settingKey: 1 }, { unique: true });
   }
 }
 

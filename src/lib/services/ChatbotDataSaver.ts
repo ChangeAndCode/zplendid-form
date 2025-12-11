@@ -1,10 +1,10 @@
 /**
- * Servicio para guardar datos del chatbot en MySQL
- * Reutiliza la misma estructura de tablas que el formulario tradicional
- * NO modifica código existente - solo guarda datos del chatbot
+ * Servicio para guardar datos del chatbot en MongoDB
+ * Reutiliza la misma estructura de colecciones que el formulario tradicional
  */
 
-import { getConnection } from '../config/database';
+import { getCollection } from '../config/database';
+import { ObjectId } from 'mongodb';
 import { PatientRecordModel } from '../models/PatientRecord';
 import { AutoSchema } from '../utils/autoSchema';
 import {
@@ -49,14 +49,14 @@ export class ChatbotDataSaver {
 
   /**
    * Función auxiliar para normalizar valores a string
-   * MySQL manejará automáticamente los límites de longitud de las columnas
+   * MongoDB manejará automáticamente los límites de longitud de los campos
    */
   private static mapStringValue(value: string | undefined): string {
     if (!value || value === '' || value === 'undefined' || value === 'null') {
       return '';
     }
     const str = String(value);
-    // MySQL manejará automáticamente los límites de VARCHAR(255) y TEXT
+    // MongoDB no tiene límites de longitud predefinidos
     // No truncamos manualmente para no perder información
     return str;
   }
@@ -70,8 +70,6 @@ export class ChatbotDataSaver {
     data: Record<string, any>,
     ensureColumnsFn?: () => Promise<void>
   ): Promise<boolean> {
-    const connection = await getConnection();
-
     try {
       // Validar nombre de tabla
       if (!this.validateTableName(tableName)) {
@@ -79,62 +77,56 @@ export class ChatbotDataSaver {
         return false;
       }
 
-      // Asegurar que las columnas existan si hay función de ensure
+      // Asegurar que la colección exista si hay función de ensure
       if (ensureColumnsFn) {
         await ensureColumnsFn();
       }
 
-      // Normalizar todos los valores y validar nombres de campos
-      const mappedData: Record<string, string> = {};
+      const collection = await getCollection(tableName);
+
+      // Normalizar y limpiar datos
+      const mappedData: Record<string, any> = {};
       Object.keys(data).forEach(key => {
         if (this.validateFieldName(key)) {
           const value = data[key];
-          // Manejar valores undefined/null explícitamente
-          if (value === undefined || value === null) {
-            mappedData[key] = '';
-          } else {
+          if (value !== undefined && value !== null) {
             mappedData[key] = this.mapStringValue(value);
           }
-        } else {
-          console.warn(`Nombre de campo inválido ignorado: ${key}`);
         }
       });
 
-      // Verificar si ya existe un registro
-      const [existing] = await connection.execute(
-        `SELECT id FROM \`${tableName}\` WHERE medicalRecordId = ?`,
-        [medicalRecordId]
-      );
-
-      const fields = Object.keys(mappedData);
-      if (fields.length === 0) {
+      if (Object.keys(mappedData).length === 0) {
         console.warn(`No hay campos válidos para guardar en ${tableName}`);
         return false;
       }
 
-      const placeholders = fields.map(() => '?').join(', ');
-      const setClause = fields.map(field => `\`${field}\` = ?`).join(', ');
-      const values = fields.map(field => mappedData[field]);
+      // Convertir medicalRecordId a ObjectId si es necesario
+      const medicalRecordIdValue = typeof medicalRecordId === 'string' && ObjectId.isValid(medicalRecordId)
+        ? new ObjectId(medicalRecordId)
+        : medicalRecordId;
 
-      if (Array.isArray(existing) && existing.length > 0) {
+      // Verificar si ya existe un registro
+      const existing = await collection.findOne({ medicalRecordId: medicalRecordIdValue });
+
+      const now = new Date();
+      if (existing) {
         // Actualizar registro existente
-        console.log(`   🔄 Ejecutando UPDATE en ${tableName} para medicalRecordId ${medicalRecordId}`);
-        console.log(`      Campos a actualizar: ${fields.length} (${fields.slice(0, 5).join(', ')}${fields.length > 5 ? '...' : ''})`);
-        const updateResult = await connection.execute(
-          `UPDATE \`${tableName}\` SET ${setClause}, updatedAt = NOW() WHERE medicalRecordId = ?`,
-          [...values, medicalRecordId]
+        await collection.updateOne(
+          { medicalRecordId: medicalRecordIdValue },
+          {
+            $set: { ...mappedData, updatedAt: now }
+          }
         );
         console.log(`   ✅ UPDATE ejecutado exitosamente en ${tableName}`);
         return true;
       } else {
         // Crear nuevo registro
-        console.log(`   ➕ Ejecutando INSERT en ${tableName} para medicalRecordId ${medicalRecordId}`);
-        console.log(`      Campos a insertar: ${fields.length} (${fields.slice(0, 5).join(', ')}${fields.length > 5 ? '...' : ''})`);
-        const fieldsList = fields.map(f => `\`${f}\``).join(', ');
-        const insertResult = await connection.execute(
-          `INSERT INTO \`${tableName}\` (medicalRecordId, ${fieldsList}, createdAt, updatedAt) VALUES (?, ${placeholders}, NOW(), NOW())`,
-          [medicalRecordId, ...values]
-        );
+        await collection.insertOne({
+          medicalRecordId: medicalRecordIdValue,
+          ...mappedData,
+          createdAt: now,
+          updatedAt: now
+        });
         console.log(`   ✅ INSERT ejecutado exitosamente en ${tableName}`);
         return true;
       }
@@ -148,41 +140,50 @@ export class ChatbotDataSaver {
    * Obtiene o crea el medical_record para un usuario
    */
   private static async getOrCreateMedicalRecord(userId: number, patientId: string): Promise<number> {
-    const connection = await getConnection();
-
     try {
       // Validar userId
-      if (!userId || typeof userId !== 'number' || isNaN(userId)) {
+      if (!userId || (typeof userId !== 'number' && typeof userId !== 'string')) {
         throw new Error('userId inválido');
       }
 
-      // Buscar registro médico existente
-      const [medicalRecords] = await connection.execute(
-        'SELECT id FROM medical_records WHERE userId = ? LIMIT 1',
-        [userId]
-      );
+      const collection = await getCollection('medical_records');
+      
+      // Convertir userId numérico a ObjectId
+      const { getUserIdAsObjectId } = await import('../utils/mongoIdHelper');
+      const userIdValue = await getUserIdAsObjectId(userId);
+      
+      if (!userIdValue) {
+        throw new Error('Usuario no encontrado');
+      }
 
-      if (Array.isArray(medicalRecords) && medicalRecords.length > 0) {
-        const record = medicalRecords[0] as { id: number };
-        if (record && record.id) {
-          return record.id;
-        }
+      // Buscar registro médico existente
+      const existing = await collection.findOne({ userId: userIdValue });
+
+      if (existing) {
+        // Retornar id numérico para compatibilidad
+        return existing._id ? parseInt(existing._id.toString().slice(-8), 16) : (existing.id || 0);
       }
 
       // Crear nuevo registro médico
-      const [result] = await connection.execute(
-        `INSERT INTO medical_records 
-         (userId, recordNumber, formType, formData, isCompleted, createdAt, updatedAt) 
-         VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-        [userId, patientId, 'chatbot', '{}', 0]
-      );
+      const now = new Date();
+      const newRecord = {
+        userId: userIdValue,
+        recordNumber: patientId,
+        formType: 'chatbot',
+        formData: {},
+        isCompleted: false,
+        createdAt: now,
+        updatedAt: now
+      };
 
-      const insertResult = result as { insertId: number };
-      if (!insertResult || !insertResult.insertId) {
+      const result = await collection.insertOne(newRecord);
+      
+      if (!result.insertedId) {
         throw new Error('No se pudo obtener el ID del registro médico creado');
       }
 
-      return insertResult.insertId;
+      // Retornar id numérico para compatibilidad
+      return parseInt(result.insertedId.toString().slice(-8), 16);
     } catch (error) {
       console.error('Error en getOrCreateMedicalRecord:', error);
       throw error;
@@ -190,7 +191,7 @@ export class ChatbotDataSaver {
   }
 
   /**
-   * Guarda todos los datos del chatbot en las tablas correspondientes
+   * Guarda todos los datos del chatbot en las colecciones correspondientes
    */
   static async saveChatbotData(
     userId: number,

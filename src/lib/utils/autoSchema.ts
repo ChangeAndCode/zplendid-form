@@ -1,86 +1,28 @@
-import { getConnection } from '../config/database';
+import { getCollection } from '../config/database';
 
 /**
- * Utilidad para asegurar que las columnas de una tabla existan automáticamente
- * Similar al comportamiento de Excel donde las columnas se crean cuando se necesitan
+ * Utilidad para asegurar que las colecciones existan automáticamente
+ * En MongoDB no necesitamos crear columnas, solo verificar que la colección existe
  */
 export class AutoSchema {
 
   /**
-   * Asegurar que una tabla tenga todas las columnas especificadas
-   * @param tableName Nombre de la tabla
-   * @param requiredColumns Array de objetos con {name: string, type: string, nullable?: boolean}
+   * Asegurar que una colección exista (equivalente a ensureColumns en MySQL)
+   * @param tableName Nombre de la colección
+   * @param requiredColumns Array de objetos (no se usa en MongoDB, pero se mantiene para compatibilidad)
    */
   static async ensureColumns(
     tableName: string,
     requiredColumns: Array<{ name: string, type: string, nullable?: boolean }>
   ): Promise<void> {
-    const connection = await getConnection();
-
     try {
-      // Verificar si la tabla existe
-      const [tables] = await connection.execute(`
-        SELECT TABLE_NAME 
-        FROM INFORMATION_SCHEMA.TABLES 
-        WHERE TABLE_SCHEMA = DATABASE() 
-        AND TABLE_NAME = ?
-      `, [tableName]);
-
-      const tableExists = Array.isArray(tables) && tables.length > 0;
-
-      if (!tableExists) {
-        // CREAR LA TABLA COMPLETA desde cero
-        console.log(`🔨 Creando tabla completa: ${tableName}`);
-
-        const columnDefinitions = requiredColumns.map(col => {
-          const nullable = col.nullable !== false ? 'NULL' : 'NOT NULL';
-          return `${col.name} ${col.type} ${nullable}`;
-        }).join(',\n        ');
-
-        const createTableQuery = `
-          CREATE TABLE ${tableName} (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            medicalRecordId INT NOT NULL UNIQUE,
-            ${columnDefinitions},
-            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            FOREIGN KEY (medicalRecordId) REFERENCES medical_records(id) ON DELETE CASCADE
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        `;
-
-        await connection.execute(createTableQuery);
-        console.log(`✅ Tabla ${tableName} creada completamente con todas las columnas`);
-
-      } else {
-        // La tabla existe, solo agregar columnas faltantes
-        console.log(`📋 Verificando columnas faltantes en tabla existente: ${tableName}`);
-
-        const [columns] = await connection.execute(`
-          SELECT COLUMN_NAME 
-          FROM INFORMATION_SCHEMA.COLUMNS 
-          WHERE TABLE_SCHEMA = DATABASE() 
-          AND TABLE_NAME = ?
-        `, [tableName]);
-
-        const existingColumns = Array.isArray(columns)
-          ? (columns as { COLUMN_NAME: string }[]).map(col => col.COLUMN_NAME)
-          : [];
-
-        // Agregar solo las columnas que no existen
-        for (const column of requiredColumns) {
-          if (!existingColumns.includes(column.name)) {
-            const nullable = column.nullable !== false ? 'NULL' : 'NOT NULL';
-            await connection.execute(`
-              ALTER TABLE ${tableName} 
-              ADD COLUMN ${column.name} ${column.type} ${nullable}
-            `);
-            console.log(`✅ Columna automáticamente agregada: ${tableName}.${column.name}`);
-          }
-        }
-      }
-
+      // En MongoDB, las colecciones se crean automáticamente al insertar
+      // Solo verificamos que podemos acceder a la colección
+      const collection = await getCollection(tableName);
+      await collection.findOne({}); // Operación simple para verificar acceso
+      console.log(`✅ Colección ${tableName} verificada`);
     } catch (error) {
-      console.error(`❌ Error al verificar/crear tabla ${tableName}:`, error);
+      console.error(`❌ Error al verificar colección ${tableName}:`, error);
       // No lanzar el error para no interrumpir el flujo principal
     }
   }

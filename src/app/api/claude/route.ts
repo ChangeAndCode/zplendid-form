@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
         console.warn('⚠️ Token inválido o expirado, guardado incremental deshabilitado:', error instanceof Error ? error.message : 'Error desconocido');
       }
     } else {
-      console.warn('⚠️ No se encontró token en la petición. El guardado en MySQL estará deshabilitado.');
+      console.warn('⚠️ No se encontró token en la petición. El guardado en MongoDB estará deshabilitado.');
     }
 
     const { message, conversationHistory = [], category, language = 'en', patientId, sessionId }: ClaudeRequest = await request.json();
@@ -55,8 +55,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Función auxiliar para cargar datos desde MySQL a extractedData
-    const loadExtractedDataFromMySQL = async (userId: number | null, patientId: string | undefined): Promise<Record<string, any>> => {
+    // Función auxiliar para cargar datos desde MongoDB a extractedData
+    const loadExtractedDataFromMongoDB = async (userId: number | null, patientId: string | undefined): Promise<Record<string, any>> => {
       if (!userId || !patientId) return {};
 
       try {
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
         if (!patientDetails || !patientDetails.chatbotData) return {};
 
-        // Convertir datos de las tablas MySQL a formato extractedData
+        // Convertir datos de las colecciones MongoDB a formato extractedData
         const extractedData: Record<string, any> = {};
 
         // Combinar todos los datos en un solo objeto
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
         return extractedData;
       } catch (error) {
-        console.warn('Error al cargar datos desde MySQL:', error);
+        console.warn('Error al cargar datos desde MongoDB:', error);
         return {};
       }
     };
@@ -95,9 +95,9 @@ export async function POST(request: NextRequest) {
       // Crear nueva sesión (usa 'guest' si no hay patientId) y responder sin invocar a Claude
       currentSession = await chatSessionService.createSession(patientId || 'guest');
 
-      // Cargar datos existentes desde MySQL si hay userId y patientId
+      // Cargar datos existentes desde MongoDB si hay userId y patientId
       if (userId && patientId) {
-        const existingData = await loadExtractedDataFromMySQL(userId, patientId);
+        const existingData = await loadExtractedDataFromMongoDB(userId, patientId);
         if (Object.keys(existingData).length > 0) {
           await chatSessionService.updateExtractedData(currentSession.id, existingData);
           currentSession.extractedData = existingData;
@@ -118,9 +118,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Si la sesión no tiene extractedData o está vacío, cargar desde MySQL
+      // Si la sesión no tiene extractedData o está vacío, cargar desde MongoDB
       if ((!currentSession.extractedData || Object.keys(currentSession.extractedData).length === 0) && userId && currentSession.patientId && currentSession.patientId !== 'guest') {
-        const existingData = await loadExtractedDataFromMySQL(userId, currentSession.patientId);
+        const existingData = await loadExtractedDataFromMongoDB(userId, currentSession.patientId);
         if (Object.keys(existingData).length > 0) {
           await chatSessionService.updateExtractedData(currentSession.id, existingData);
           currentSession.extractedData = existingData;
@@ -130,9 +130,9 @@ export async function POST(request: NextRequest) {
       // Si hay patientId pero no sessionId, crear una nueva sesión
       currentSession = await chatSessionService.createSession(patientId);
 
-      // Cargar datos existentes desde MySQL
+      // Cargar datos existentes desde MongoDB
       if (userId) {
-        const existingData = await loadExtractedDataFromMySQL(userId, patientId);
+        const existingData = await loadExtractedDataFromMongoDB(userId, patientId);
         if (Object.keys(existingData).length > 0) {
           await chatSessionService.updateExtractedData(currentSession.id, existingData);
           currentSession.extractedData = existingData;
@@ -147,22 +147,22 @@ export async function POST(request: NextRequest) {
     const currentCategory = currentSession.currentCategory || category || 'personal';
     const basePrompt = buildBasePrompt(currentCategory, language);
 
-    // SIEMPRE consultar MySQL para obtener la información más actualizada
+    // SIEMPRE consultar MongoDB para obtener la información más actualizada
     // Esta es la fuente de verdad, ya que de aquí se genera el PDF
     let extractedData: Record<string, any> = {};
     if (userId && currentSession.patientId && currentSession.patientId !== 'guest') {
-      console.log('📊 Consultando MySQL para obtener datos recopilados del paciente...');
-      const mysqlData = await loadExtractedDataFromMySQL(userId, currentSession.patientId);
-      if (Object.keys(mysqlData).length > 0) {
-        extractedData = mysqlData;
-        console.log(`✅ Datos cargados desde MySQL: ${Object.keys(extractedData).length} campos`);
-        // Actualizar también en MongoDB para mantener sincronización
+      console.log('📊 Consultando MongoDB para obtener datos recopilados del paciente...');
+      const mongoData = await loadExtractedDataFromMongoDB(userId, currentSession.patientId);
+      if (Object.keys(mongoData).length > 0) {
+        extractedData = mongoData;
+        console.log(`✅ Datos cargados desde MongoDB: ${Object.keys(extractedData).length} campos`);
+        // Actualizar también en la sesión para mantener sincronización
         await chatSessionService.updateExtractedData(currentSession.id, extractedData);
       } else {
-        // Si no hay datos en MySQL, intentar obtener de la sesión MongoDB como fallback
+        // Si no hay datos en MongoDB, intentar obtener de la sesión como fallback
         const updatedSession = await chatSessionService.getSession(currentSession.id);
         extractedData = updatedSession?.extractedData || currentSession.extractedData || {};
-        console.log(`⚠️ No hay datos en MySQL, usando datos de sesión: ${Object.keys(extractedData).length} campos`);
+        console.log(`⚠️ No hay datos en MongoDB, usando datos de sesión: ${Object.keys(extractedData).length} campos`);
       }
     } else {
       // Si no hay userId o patientId, usar datos de la sesión MongoDB
@@ -269,67 +269,67 @@ export async function POST(request: NextRequest) {
             console.log('⚠️ No se extrajeron datos de la conversación');
           }
 
-          // Actualizar extractedData en la sesión y guardar en MySQL
+          // Actualizar extractedData en la sesión y guardar en MongoDB
           if (Object.keys(extractedData).length > 0) {
-            // IMPORTANTE: Usar MySQL como fuente de verdad para el merge
-            // Cargar datos actuales de MySQL antes de hacer merge
-            let mysqlCurrentData: Record<string, any> = {};
+            // IMPORTANTE: Usar MongoDB como fuente de verdad para el merge
+            // Cargar datos actuales de MongoDB antes de hacer merge
+            let mongoCurrentData: Record<string, any> = {};
             if (userId && currentSession.patientId && currentSession.patientId !== 'guest') {
               try {
-                mysqlCurrentData = await loadExtractedDataFromMySQL(userId, currentSession.patientId);
-                console.log(`📊 Datos actuales en MySQL: ${Object.keys(mysqlCurrentData).length} campos`);
-              } catch (mysqlError) {
-                console.warn('⚠️ Error al cargar datos de MySQL para merge:', mysqlError);
-                // Si falla, usar datos de MongoDB como fallback
+                mongoCurrentData = await loadExtractedDataFromMongoDB(userId, currentSession.patientId);
+                console.log(`📊 Datos actuales en MongoDB: ${Object.keys(mongoCurrentData).length} campos`);
+              } catch (mongoError) {
+                console.warn('⚠️ Error al cargar datos de MongoDB para merge:', mongoError);
+                // Si falla, usar datos de la sesión como fallback
                 const updatedSession = await chatSessionService.getSession(currentSession.id);
-                mysqlCurrentData = updatedSession?.extractedData || currentSession.extractedData || {};
+                mongoCurrentData = updatedSession?.extractedData || currentSession.extractedData || {};
               }
             } else {
-              // Si no hay userId, usar datos de MongoDB
+              // Si no hay userId, usar datos de la sesión
               const updatedSession = await chatSessionService.getSession(currentSession.id);
-              mysqlCurrentData = updatedSession?.extractedData || currentSession.extractedData || {};
+              mongoCurrentData = updatedSession?.extractedData || currentSession.extractedData || {};
             }
 
-            // Hacer merge: MySQL (base) + datos extraídos (tienen prioridad)
-            // Los datos extraídos sobrescriben los de MySQL si hay conflictos
-            const mergedData = { ...mysqlCurrentData, ...extractedData };
+            // Hacer merge: MongoDB (base) + datos extraídos (tienen prioridad)
+            // Los datos extraídos sobrescriben los de MongoDB si hay conflictos
+            const mergedData = { ...mongoCurrentData, ...extractedData };
 
-            // Actualizar también en MongoDB para mantener sincronización
+            // Actualizar también en la sesión para mantener sincronización
             await chatSessionService.updateExtractedData(currentSession.id, mergedData);
 
             console.log('📦 Datos combinados (merged):', Object.keys(mergedData).length, 'campos totales');
-            console.log(`   - De MySQL: ${Object.keys(mysqlCurrentData).length} campos`);
+            console.log(`   - De MongoDB: ${Object.keys(mongoCurrentData).length} campos`);
             console.log(`   - Extraídos ahora: ${Object.keys(extractedData).length} campos`);
 
-            // Guardar en MySQL si tenemos userId
+            // Guardar en MongoDB si tenemos userId
             if (userId) {
               try {
-                console.log('💾 Guardando datos en MySQL...');
+                console.log('💾 Guardando datos en MongoDB...');
                 const saveResult = await ChatbotDataSaver.saveChatbotData(userId, mergedData);
 
                 if (saveResult.success) {
-                  console.log('✅ Datos guardados exitosamente en MySQL');
-                  console.log('   Tablas guardadas:', saveResult.savedTables?.join(', ') || 'ninguna');
+                  console.log('✅ Datos guardados exitosamente en MongoDB');
+                  console.log('   Colecciones guardadas:', saveResult.savedTables?.join(', ') || 'ninguna');
                   if (saveResult.savedTables && saveResult.savedTables.length > 0) {
                     saveResult.savedTables.forEach(table => {
                       console.log(`   ✓ ${table} guardado correctamente`);
                     });
                   } else {
-                    console.warn('   ⚠️ No se guardaron datos en ninguna tabla (posiblemente no hay datos nuevos)');
+                    console.warn('   ⚠️ No se guardaron datos en ninguna colección (posiblemente no hay datos nuevos)');
                   }
                 } else {
-                  console.error('❌ Error al guardar en MySQL:', saveResult.message);
+                  console.error('❌ Error al guardar en MongoDB:', saveResult.message);
                 }
               } catch (saveError) {
                 // No fallar la respuesta si el guardado falla, solo loguear
-                console.error('❌ Error al guardar datos en MySQL:', saveError);
+                console.error('❌ Error al guardar datos en MongoDB:', saveError);
                 if (saveError instanceof Error) {
                   console.error('   Mensaje:', saveError.message);
                   console.error('   Stack:', saveError.stack);
                 }
               }
             } else {
-              console.warn('⚠️ No hay userId, datos no se guardarán en MySQL (solo en MongoDB)');
+              console.warn('⚠️ No hay userId, datos no se guardarán en MongoDB (solo en sesión)');
             }
           } else {
             console.log('ℹ️ No hay datos nuevos para guardar');

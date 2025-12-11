@@ -1,4 +1,4 @@
-import mysql from 'mysql2/promise';
+import { MongoClient, Db, Collection } from 'mongodb';
 import dotenv from 'dotenv';
 
 // Cargar variables de entorno
@@ -6,107 +6,88 @@ dotenv.config({ path: '.env' });
 dotenv.config({ path: '.env.local' });
 dotenv.config({ path: '.env.production' });
 
-export interface DatabaseConfig {
-  host: string;
-  user: string;
-  password: string;
-  database: string;
-  port: number;
+// Singleton para la conexión MongoDB
+let client: MongoClient | null = null;
+let db: Db | null = null;
+
+// Wrapper para mantener compatibilidad con código existente
+export interface DatabaseConnection {
+  execute: (query: string, params?: any[]) => Promise<[any[], any]>;
+  getConnection?: () => Promise<Collection>;
 }
 
-// Función para validar variables de entorno requeridas
-const getRequiredEnvVar = (name: string): string => {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`❌ Variable de entorno requerida no encontrada: ${name}`);
-  }
-  return value;
-};
-
-// Función para validar puerto
-const getRequiredPort = (): number => {
-  const portStr = process.env.DB_PORT;
-  if (!portStr) {
-    throw new Error('❌ Variable de entorno requerida no encontrada: DB_PORT');
-  }
-  const port = parseInt(portStr);
-  if (isNaN(port)) {
-    throw new Error(`❌ DB_PORT debe ser un número válido, recibido: ${portStr}`);
-  }
-  return port;
-};
-
-const config: DatabaseConfig = {
-  host: getRequiredEnvVar('DB_HOST'),
-  user: getRequiredEnvVar('DB_USER'),
-  password: getRequiredEnvVar('DB_PASSWORD'),
-  database: getRequiredEnvVar('DB_NAME'),
-  port: getRequiredPort(),
-};
-
-// Debug: Log configuration (sin mostrar password)
-console.log('🔧 Database config:', {
-  host: config.host,
-  user: config.user,
-  database: config.database,
-  port: config.port,
-  hasPassword: !!config.password
-});
-
-// Pool singleton para entornos serverless (Render) — evita "connection is in closed state"
-let pool: mysql.Pool | null = null;
-
-function createPool(): mysql.Pool {
-  return mysql.createPool({
-    host: config.host,
-    user: config.user,
-    password: config.password,
-    database: config.database,
-    port: config.port,
-    waitForConnections: true,
-    connectionLimit: 5,
-    queueLimit: 0,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 0,
-    // Configuración de timeouts para Render
-    connectTimeout: 30000, // 30 segundos para establecer conexión
-    acquireTimeout: 30000, // 30 segundos para adquirir conexión del pool
-    timeout: 30000, // 30 segundos para queries
-    // SSL si es necesario (para bases de datos remotas)
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
-  });
-}
-
-export const getConnection = async (): Promise<mysql.Pool> => {
-  if (!pool) {
+/**
+ * Obtener conexión a MongoDB
+ */
+export const getConnection = async (): Promise<DatabaseConnection> => {
+  if (!db || !client) {
     try {
-      pool = createPool();
-      console.log('✅ Pool MySQL inicializado');
+      const mongoUri = process.env.MONGODB_URI;
+      if (!mongoUri) {
+        throw new Error('❌ Variable de entorno requerida no encontrada: MONGODB_URI');
+      }
+
+      client = new MongoClient(mongoUri);
+      await client.connect();
+      db = client.db('zplendid');
       
-      // Verificar conexión inmediatamente
+      console.log('✅ Conexión a MongoDB establecida');
+      
+      // Verificar conexión
       try {
-        const testConnection = await pool.getConnection();
-        await testConnection.ping();
-        testConnection.release();
-        console.log('✅ Conexión a MySQL verificada exitosamente');
+        await db.admin().ping();
+        console.log('✅ Conexión a MongoDB verificada exitosamente');
       } catch (pingError) {
-        console.error('❌ Error al verificar conexión MySQL:', pingError);
-        // No lanzar error aquí, solo loguear - el pool se creó pero la conexión falla
+        console.error('❌ Error al verificar conexión MongoDB:', pingError);
       }
     } catch (error) {
-      console.error('❌ Error al crear el pool de MySQL:', error);
+      console.error('❌ Error al conectar a MongoDB:', error);
       throw error;
     }
   }
-  return pool;
+
+  // Retornar wrapper para compatibilidad (no se usa directamente)
+  return {
+    execute: async (query: string, params?: any[]) => {
+      // Este método no se usará directamente, los modelos usarán las colecciones
+      throw new Error('Use getCollection() instead of execute()');
+    }
+  };
+};
+
+/**
+ * Obtener una colección específica
+ */
+export const getCollection = async <T = any>(collectionName: string): Promise<Collection<T>> => {
+  if (!db) {
+    await getConnection();
+  }
+  if (!db) {
+    throw new Error('Database not initialized');
+  }
+  return db.collection<T>(collectionName);
+};
+
+/**
+ * Obtener la instancia de la base de datos directamente
+ */
+export const getDatabase = async (): Promise<Db> => {
+  if (!db) {
+    await getConnection();
+  }
+  if (!db) {
+    throw new Error('Database not initialized');
+  }
+  return db;
 };
 
 export const closeConnection = async (): Promise<void> => {
-  if (pool) {
-    await pool.end();
-    pool = null;
-    console.log('🔌 Pool MySQL cerrado');
+  if (client) {
+    await client.close();
+    client = null;
+    db = null;
+    console.log('🔌 Conexión a MongoDB cerrada');
   }
 };
 
-export default config;
+export default { getConnection, getCollection, getDatabase, closeConnection };

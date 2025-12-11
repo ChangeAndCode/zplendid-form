@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PatientRecordModel } from '../../../../lib/models/PatientRecord';
-import { getConnection } from '../../../../lib/config/database';
+import { getCollection } from '../../../../lib/config/database';
+import { ObjectId } from 'mongodb';
 import { JWTUtils } from '../../../../lib/utils/jwt';
 import { AutoSchema } from '../../../../lib/utils/autoSchema';
 
@@ -101,13 +102,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Buscar registro médico
-    const connection = await getConnection();
-    const [medicalRecords] = await connection.execute(
-      'SELECT id FROM medical_records WHERE userId = ? LIMIT 1',
-      [decoded.userId]
-    );
-
-    if (!Array.isArray(medicalRecords) || medicalRecords.length === 0) {
+    const medicalRecordsCollection = await getCollection('medical_records');
+    const { getUserIdAsObjectId } = await import('../../../../lib/utils/mongoIdHelper');
+    const userIdValue = await getUserIdAsObjectId(decoded.userId);
+    
+    if (!userIdValue) {
+      return NextResponse.json({
+        success: true,
+        data: null,
+        message: 'No hay datos guardados'
+      });
+    }
+    
+    const medicalRecord = await medicalRecordsCollection.findOne({ userId: userIdValue });
+    
+    if (!medicalRecord) {
       return NextResponse.json({
         success: true,
         data: null,
@@ -115,15 +124,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const medicalRecordId = (medicalRecords[0] as { id: number }).id;
+    const medicalRecordId = medicalRecord._id;
 
     // Obtener datos del interés quirúrgico
-    const [surgeryData] = await connection.execute(
-      'SELECT * FROM surgery_interest WHERE medicalRecordId = ?',
-      [medicalRecordId]
-    );
+    const surgeryInterestCollection = await getCollection('surgery_interest');
+    const surgeryData = await surgeryInterestCollection.findOne({ medicalRecordId });
 
-    if (!Array.isArray(surgeryData) || surgeryData.length === 0) {
+    if (!surgeryData) {
       return NextResponse.json({
         success: true,
         data: null,
@@ -133,7 +140,7 @@ export async function GET(request: NextRequest) {
 
     // Tipo para los datos de la base de datos (incluye todos los campos posibles)
     type SurgeryInterestDBData = Record<string, string | null | undefined>;
-    const data = surgeryData[0] as SurgeryInterestDBData;
+    const data = surgeryData as any;
 
     // Función para mapear valores de la base de datos al formulario
     const mapFormValue = (value: string | null | undefined): string => {
@@ -256,24 +263,36 @@ export async function POST(request: NextRequest) {
     }
 
     // Buscar o crear registro médico
-    const connection = await getConnection();
-    const [medicalRecords] = await connection.execute(
-      'SELECT id FROM medical_records WHERE userId = ? LIMIT 1',
-      [decoded.userId]
-    );
-
-    let medicalRecordId: number;
-    if (Array.isArray(medicalRecords) && medicalRecords.length > 0) {
-      medicalRecordId = (medicalRecords[0] as { id: number }).id;
-    } else {
-      const [result] = await connection.execute(
-        `INSERT INTO medical_records 
-         (userId, recordNumber, formType, formData, isCompleted, createdAt, updatedAt) 
-         VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-        [decoded.userId, patientRecord.patientId, 'surgery_interest', '{}', 0]
+    const medicalRecordsCollection = await getCollection('medical_records');
+    const { getUserIdAsObjectId } = await import('../../../../lib/utils/mongoIdHelper');
+    const userIdValue = await getUserIdAsObjectId(decoded.userId);
+    
+    if (!userIdValue) {
+      return NextResponse.json(
+        { success: false, message: 'Usuario no encontrado' },
+        { status: 404 }
       );
-      const insertResult = result as { insertId: number };
-      medicalRecordId = insertResult.insertId;
+    }
+    
+    let medicalRecord = await medicalRecordsCollection.findOne({ userId: userIdValue });
+    let medicalRecordId: any;
+    
+    if (medicalRecord) {
+      medicalRecordId = medicalRecord._id;
+    } else {
+      // Crear registro médico
+      const now = new Date();
+      const newRecord = {
+        userId: userIdValue,
+        recordNumber: patientRecord.patientId,
+        formType: 'surgery_interest',
+        formData: {},
+        isCompleted: false,
+        createdAt: now,
+        updatedAt: now
+      };
+      const result = await medicalRecordsCollection.insertOne(newRecord);
+      medicalRecordId = result.insertedId;
     }
 
     // Guardar los datos del formulario en la tabla específica
@@ -296,29 +315,30 @@ export async function POST(request: NextRequest) {
     });
 
     // Verificar si ya existe un registro para este paciente
-    const [existing] = await connection.execute(
-      'SELECT id FROM surgery_interest WHERE medicalRecordId = ?',
-      [medicalRecordId]
-    );
+    const surgeryInterestCollection = await getCollection('surgery_interest');
+    const medicalRecordIdValue = typeof medicalRecordId === 'string' && ObjectId.isValid(medicalRecordId)
+      ? new ObjectId(medicalRecordId)
+      : medicalRecordId;
+    
+    const existing = await surgeryInterestCollection.findOne({ medicalRecordId: medicalRecordIdValue });
+    const now = new Date();
 
-    // Crear consultas SQL dinámicamente
-    const fields = Object.keys(mappedData);
-    const placeholders = fields.map(() => '?').join(', ');
-    const setClause = fields.map(field => `${field} = ?`).join(', ');
-    const values = fields.map(field => mappedData[field]);
-
-    if (Array.isArray(existing) && existing.length > 0) {
+    if (existing) {
       // Actualizar registro existente
-      await connection.execute(
-        `UPDATE surgery_interest SET ${setClause}, updatedAt = NOW() WHERE medicalRecordId = ?`,
-        [...values, medicalRecordId]
+      await surgeryInterestCollection.updateOne(
+        { medicalRecordId: medicalRecordIdValue },
+        {
+          $set: { ...mappedData, updatedAt: now }
+        }
       );
     } else {
       // Crear nuevo registro
-      await connection.execute(
-        `INSERT INTO surgery_interest (medicalRecordId, ${fields.join(', ')}) VALUES (?, ${placeholders})`,
-        [medicalRecordId, ...values]
-      );
+      await surgeryInterestCollection.insertOne({
+        medicalRecordId: medicalRecordIdValue,
+        ...mappedData,
+        createdAt: now,
+        updatedAt: now
+      });
     }
 
     return NextResponse.json({
