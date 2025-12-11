@@ -1837,6 +1837,11 @@ function SettingsTab({ language }: { language: string }) {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const loadSettings = useCallback(async () => {
+    if (!token) {
+      // No loguear error si simplemente no hay token, es un caso esperado
+      return;
+    }
+    
     try {
       const response = await fetch('/api/admin/settings', {
         headers: {
@@ -1854,9 +1859,16 @@ function SettingsTab({ language }: { language: string }) {
           user: settings.SMTP_USER || '',
           password: settings.SMTP_PASSWORD || ''
         });
+      } else {
+        const errorData = await response.json();
+        // Solo loguear si hay un error real, no si es simplemente falta de token
+        if (response.status !== 401) {
+          console.error('Error al cargar configuración:', errorData.message);
+        }
       }
-    } catch {
-      console.error('Error al cargar configuración');
+    } catch (error) {
+      // Solo loguear errores de red u otros errores inesperados
+      console.error('Error al cargar configuración:', error);
     }
   }, [token]);
 
@@ -1866,6 +1878,12 @@ function SettingsTab({ language }: { language: string }) {
 
   const handleSaveEmailConfig = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!token) {
+      setMessage({ type: 'error', text: 'No hay token disponible. Por favor, inicia sesión nuevamente.' });
+      return;
+    }
+    
     setIsLoading(true);
     setMessage(null);
 

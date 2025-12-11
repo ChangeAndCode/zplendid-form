@@ -33,8 +33,17 @@ export async function GET(request: NextRequest) {
       data: settings
     }, { status: 200 });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al obtener configuraciones:', error);
+    
+    // Si es un error de token, retornar 401
+    if (error?.code === 'TOKEN_INVALID' || error?.code === 'TOKEN_EXPIRED') {
+      return NextResponse.json(
+        { success: false, message: error.message || 'Token inválido o expirado' },
+        { status: 401 }
+      );
+    }
+    
     return NextResponse.json(
       { success: false, message: 'Error interno del servidor' },
       { status: 500 }
@@ -88,8 +97,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al guardar configuración:', error);
+    
+    // Si es un error de token, retornar 401
+    if (error?.code === 'TOKEN_INVALID' || error?.code === 'TOKEN_EXPIRED') {
+      return NextResponse.json(
+        { success: false, message: error.message || 'Token inválido o expirado' },
+        { status: 401 }
+      );
+    }
+    
     return NextResponse.json(
       { success: false, message: 'Error interno del servidor' },
       { status: 500 }

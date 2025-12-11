@@ -146,20 +146,7 @@ export class AdminModel {
         },
         {
           $project: {
-            id: { 
-              $ifNull: [
-                { 
-                  $toInt: { 
-                    $substr: [
-                      { $toString: '$_id' }, 
-                      { $subtract: [{ $strLenCP: { $toString: '$_id' } }, 8] }, 
-                      8
-                    ] 
-                  } 
-                }, 
-                0
-              ] 
-            },
+            _id: 1,
             patientId: { $ifNull: [{ $arrayElemAt: ['$patientRecord.patientId', 0] }, 'Sin ID'] },
             firstName: 1,
             lastName: 1,
@@ -213,20 +200,7 @@ export class AdminModel {
         { $unwind: '$user' },
         {
           $project: {
-            id: { 
-              $ifNull: [
-                { 
-                  $toInt: { 
-                    $substr: [
-                      { $toString: '$_id' }, 
-                      { $subtract: [{ $strLenCP: { $toString: '$_id' } }, 8] }, 
-                      8
-                    ] 
-                  } 
-                }, 
-                0
-              ] 
-            },
+            _id: 1,
             userId: 1,
             licenseNumber: 1,
             specialties: 1,
@@ -495,21 +469,9 @@ export class AdminModel {
         { $unwind: '$doctorUser' },
         {
           $project: {
-            id: { 
-              $ifNull: [
-                { 
-                  $toInt: { 
-                    $substr: [
-                      { $toString: '$_id' }, 
-                      { $subtract: [{ $strLenCP: { $toString: '$_id' } }, 8] }, 
-                      8
-                    ] 
-                  } 
-                }, 
-                0
-              ] 
-            },
+            _id: 1,
             patientId: 1,
+            doctorId: '$doctor._id',
             interestArea: 1,
             assignedAt: 1,
             status: 1,
@@ -526,7 +488,23 @@ export class AdminModel {
         { $sort: { assignedAt: -1 } }
       ]).toArray();
       
-      return assignments as AssignmentRecord[];
+      return assignments.map((a: any) => ({
+        id: a._id ? parseInt(a._id.toString().slice(-8), 16) : (a.id || 0),
+        patientId: a.patientId,
+        doctorId: a.doctorId ? parseInt(a.doctorId.toString().slice(-8), 16) : (a.doctorId || 0),
+        interestArea: a.interestArea,
+        assignedAt: a.assignedAt,
+        status: a.status,
+        notes: a.notes,
+        patientName: a.patientFirstName && a.patientLastName 
+          ? `${a.patientFirstName} ${a.patientLastName}` 
+          : undefined,
+        patientEmail: a.patientEmail,
+        doctorName: a.doctorFirstName && a.doctorLastName 
+          ? `${a.doctorFirstName} ${a.doctorLastName}` 
+          : undefined,
+        doctorEmail: a.doctorEmail
+      })) as AssignmentRecord[];
     } catch (error) {
       console.error('Error al obtener historial de asignaciones:', error);
       return [];
@@ -622,20 +600,6 @@ export class AdminModel {
         {
           $project: {
             _id: 1,
-            id: { 
-              $ifNull: [
-                { 
-                  $toInt: { 
-                    $substr: [
-                      { $toString: '$_id' }, 
-                      { $subtract: [{ $strLenCP: { $toString: '$_id' } }, 8] }, 
-                      8
-                    ] 
-                  } 
-                }, 
-                0
-              ] 
-            },
             userId: 1,
             licenseNumber: 1,
             specialties: 1,
@@ -648,7 +612,18 @@ export class AdminModel {
         }
       ]).toArray();
       
-      return doctors as DoctorRecord[];
+      return doctors.map((doctor: any) => ({
+        id: doctor._id ? parseInt(doctor._id.toString().slice(-8), 16) : (doctor.id || 0),
+        userId: doctor.userId ? parseInt(doctor.userId.toString().slice(-8), 16) : (doctor.userId || 0),
+        specialties: doctor.specialties,
+        isApproved: doctor.isApproved,
+        createdAt: doctor.createdAt,
+        updatedAt: doctor.updatedAt,
+        firstName: doctor.firstName,
+        lastName: doctor.lastName,
+        email: doctor.email,
+        status: doctor.isApproved ? 'approved' : 'pending'
+      })) as DoctorRecord[];
     } catch (error) {
       console.error('Error al obtener doctores por especialidad:', error);
       return [];
@@ -705,20 +680,7 @@ export class AdminModel {
         },
         {
           $project: {
-            id: { 
-              $ifNull: [
-                { 
-                  $toInt: { 
-                    $substr: [
-                      { $toString: '$_id' }, 
-                      { $subtract: [{ $strLenCP: { $toString: '$_id' } }, 8] }, 
-                      8
-                    ] 
-                  } 
-                }, 
-                0
-              ] 
-            },
+            _id: 1,
             patientId: { $ifNull: [{ $arrayElemAt: ['$patientRecord.patientId', 0] }, 'Sin ID'] },
             firstName: 1,
             lastName: 1,
@@ -730,7 +692,14 @@ export class AdminModel {
         { $sort: { createdAt: -1 } }
       ]).toArray();
       
-      return results as SearchResult[];
+      return results.map((r: any) => ({
+        patientId: r.patientId || 'Sin ID',
+        firstName: r.firstName || '',
+        lastName: r.lastName || '',
+        email: r.email || '',
+        interestArea: r.interestArea || 'No especificado',
+        procedure: undefined
+      })) as SearchResult[];
     } catch (error) {
       console.error('Error al buscar pacientes:', error);
       throw error;
