@@ -112,8 +112,15 @@ export function generatePatientPDF(
   }
 
   // Información del paciente destacada
+  // Calcular altura dinámica del recuadro basado en contenido
+  let infoLines = 1; // Nombre siempre está
+  if (patientData.dateOfBirth) infoLines++;
+  if (patientData.email) infoLines++;
+  if (patientData.phoneNumber) infoLines++;
+  const boxHeight = 12 + (infoLines * 6) + 8; // Padding superior + líneas + padding inferior
+  
   doc.setFillColor(...accentColor);
-  doc.roundedRect(margin, yPosition, contentWidth, 30, 3, 3, 'F');
+  doc.roundedRect(margin, yPosition, contentWidth, boxHeight, 3, 3, 'F');
   
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(16);
@@ -139,7 +146,7 @@ export function generatePatientPDF(
     doc.text(`📞 ${patientData.phoneNumber}`, margin + 5, infoY);
   }
   
-  yPosition += 40;
+  yPosition += boxHeight + 5;
 
   // Función auxiliar para formatear claves como etiquetas legibles
   const formatKeyAsLabel = (key: string): string => {
@@ -414,24 +421,24 @@ export function generatePatientPDF(
       let useLeftColumn = true;
 
       shortFields.forEach((field, index) => {
-        const currentY = useLeftColumn ? leftColumnY : rightColumnY;
-        const currentX = useLeftColumn ? leftColumnX : rightColumnX;
-        
         // Verificar si necesitamos nueva página (verificar ambas columnas)
         const maxColumnY = Math.max(leftColumnY, rightColumnY);
         if (maxColumnY + 15 > pageHeight - margin - 20) {
           doc.addPage();
           leftColumnY = margin;
           rightColumnY = margin;
+          yPosition = margin; // Resetear posición global también
           useLeftColumn = true;
         }
 
+        const currentY = useLeftColumn ? leftColumnY : rightColumnY;
+        const currentX = useLeftColumn ? leftColumnX : rightColumnX;
+        
         // Renderizar campo (sin checkPageBreak interno ya que lo manejamos manualmente)
-        const savedY = yPosition;
-        yPosition = useLeftColumn ? leftColumnY : rightColumnY;
+        yPosition = currentY;
         const fieldHeight = renderFieldSingle(field.key, field.value, field.label, currentX, columnWidth, true);
         
-        // Actualizar posición de la columna correspondiente
+        // Actualizar posición de la columna correspondiente con la nueva posición
         if (useLeftColumn) {
           leftColumnY = yPosition;
         } else {
