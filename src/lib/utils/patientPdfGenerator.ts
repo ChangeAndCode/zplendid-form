@@ -220,12 +220,23 @@ export function generatePatientPDF(
     // Obtener todos los campos con datos (excluyendo metadatos)
     const excludedKeys = ['_id', 'medicalRecordId', 'createdAt', 'updatedAt'];
     const allDataKeys = Object.keys(data).filter(key => {
+      if (excludedKeys.includes(key)) return false;
       const value = data[key];
-      return !excludedKeys.includes(key) && 
-             value !== null && 
-             value !== undefined && 
-             value !== '' &&
-             typeof value !== 'object' || (typeof value === 'object' && Object.keys(value as Record<string, unknown>).length > 0);
+      if (value === null || value === undefined) return false;
+      // Si es string vacío, excluirlo
+      if (typeof value === 'string' && value.trim() === '') return false;
+      // Si es un objeto, verificar que tenga contenido
+      if (typeof value === 'object') {
+        if (Array.isArray(value)) {
+          return value.length > 0;
+        }
+        // Para objetos, verificar que tenga al menos una propiedad con valor
+        const obj = value as Record<string, unknown>;
+        return Object.keys(obj).length > 0 && 
+               Object.values(obj).some(v => v !== null && v !== undefined && v !== '');
+      }
+      // Para otros tipos (number, boolean), siempre incluirlos si tienen valor
+      return true;
     });
 
     // Separar campos: los que están en fields y los que no

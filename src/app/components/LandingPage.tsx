@@ -70,7 +70,7 @@ const formModules: FormModule[] = [
 
 export default function LandingPage() {
   const { language } = useLanguage();
-  const { isAuthenticated, isLoading, logout, patientId, getPatientRecord } = useAuth();
+  const { isAuthenticated, isLoading, logout, patientId, getPatientRecord, user } = useAuth();
   const router = useRouter();
   const [completedForms, setCompletedForms] = useState<string[]>([]);
 
@@ -195,15 +195,24 @@ export default function LandingPage() {
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-[#212e5c] tracking-tight">zplendid</h1>
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <LanguageSwitcher />
+            {user?.role === 'admin' && (
+              <a
+                href="https://zplendid-form-7gqi.onrender.com/dashboard"
+                target="_self"
+                className="bg-[#212e5c] text-white px-4 py-1 rounded text-sm hover:bg-[#1a2347] transition-colors"
+              >
+                {language === 'es' ? 'Admin' : 'Admin'}
+              </a>
+            )}
+            <button
+              onClick={logout}
+              className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors"
+            >
+              {language === 'es' ? 'Cerrar Sesión' : 'Logout'}
+            </button>
           </div>
-          <button
-            onClick={logout}
-            className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors"
-          >
-            {language === 'es' ? 'Cerrar Sesión' : 'Logout'}
-          </button>
         </div>
       </div>
 
