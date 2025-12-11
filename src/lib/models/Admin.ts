@@ -705,4 +705,66 @@ export class AdminModel {
       throw error;
     }
   }
+
+  /**
+   * Eliminar un paciente y todos sus datos relacionados
+   */
+  static async deletePatient(patientId: string): Promise<void> {
+    try {
+      const db = await getDatabase();
+      
+      // Buscar el patient_record para obtener el userId
+      const patientRecord = await db.collection('patient_records').findOne({ patientId });
+      
+      if (!patientRecord) {
+        throw new Error('Paciente no encontrado');
+      }
+
+      const userId = patientRecord.userId;
+
+      // Buscar medical_record para obtener el medicalRecordId
+      const medicalRecord = await db.collection('medical_records')
+        .findOne({ recordNumber: patientId });
+
+      // Eliminar en orden: primero los datos relacionados, luego el registro principal
+      
+      // 1. Eliminar datos de las colecciones dinámicas (si existe medicalRecord)
+      if (medicalRecord && medicalRecord._id) {
+        const collections = ['patient_info', 'surgery_interest', 'medical_history', 'family_history'];
+        for (const collectionName of collections) {
+          try {
+            const collection = await getCollection(collectionName);
+            await collection.deleteMany({ medicalRecordId: medicalRecord._id });
+          } catch (error) {
+            console.warn(`Error al eliminar de ${collectionName}:`, error);
+          }
+        }
+      }
+
+      // 2. Eliminar medical_record
+      if (medicalRecord && medicalRecord._id) {
+        await db.collection('medical_records').deleteOne({ _id: medicalRecord._id });
+      }
+
+      // 3. Eliminar patient_form_data
+      await db.collection('patient_form_data').deleteMany({ patientId });
+
+      // 4. Eliminar patient_assignments
+      await db.collection('patient_assignments').deleteMany({ patientId });
+
+      // 5. Eliminar patient_records
+      await db.collection('patient_records').deleteOne({ patientId });
+
+      // 6. Eliminar el usuario (desactivar en lugar de eliminar para mantener integridad)
+      const usersCollection = await getCollection('users');
+      await usersCollection.updateOne(
+        { _id: userId },
+        { $set: { isActive: false, updatedAt: new Date() } }
+      );
+
+    } catch (error) {
+      console.error('Error al eliminar paciente:', error);
+      throw error;
+    }
+  }
 }

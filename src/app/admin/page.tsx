@@ -1029,8 +1029,68 @@ function PatientDetailsModal({
 }) {
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [deletingPatient, setDeletingPatient] = useState(false);
   const [pdfViewUrl, setPdfViewUrl] = useState<string | null>(null);
   const { token } = useAuth();
+
+  // Funciones de mapeo para valores PGWBI y GERD
+  const mapPgwbiValue = (value: string | number): string => {
+    const val = String(value).trim();
+    const map: Record<string, { es: string; en: string }> = {
+      '6': { es: 'Muy bien', en: 'Very well' },
+      '5': { es: 'Bien', en: 'Well' },
+      '4': { es: 'Bastante bien', en: 'Fairly well' },
+      '3': { es: 'Bastante mal', en: 'Fairly bad' },
+      '2': { es: 'Mal', en: 'Bad' },
+      '1': { es: 'Muy mal', en: 'Very bad' },
+      '0': { es: 'No sé', en: 'Don\'t know' }
+    };
+    return map[val] ? map[val][language === 'es' ? 'es' : 'en'] : String(value);
+  };
+
+  const mapGerdValue = (value: string | number): string => {
+    const val = String(value).trim();
+    const map: Record<string, { es: string; en: string }> = {
+      '4': { es: 'Siempre', en: 'Always' },
+      '3': { es: 'Frecuentemente', en: 'Frequently' },
+      '2': { es: 'Algunas veces', en: 'Sometimes' },
+      '1': { es: 'Raramente', en: 'Rarely' },
+      '0': { es: 'Nunca', en: 'Never' }
+    };
+    return map[val] ? map[val][language === 'es' ? 'es' : 'en'] : String(value);
+  };
+
+  const getPgwbiLabel = (key: string): string => {
+    const labels: Record<string, { es: string; en: string }> = {
+      'pgwbi1Anxious': { es: '¿Se ha sentido ansioso, preocupado o inquieto?', en: 'Have you been anxious, worried or upset?' },
+      'pgwbi2Depressed': { es: '¿Se ha sentido deprimido o triste?', en: 'Have you been depressed or sad?' },
+      'pgwbi3SelfControl': { es: '¿Ha tenido control sobre sus emociones?', en: 'Have you had control over your emotions?' },
+      'pgwbi4Vitality': { es: '¿Se ha sentido lleno de energía y vitalidad?', en: 'Have you felt full of energy and vitality?' },
+      'pgwbi5Health': { es: '¿Se sintió lo suficientemente saludable?', en: 'Did you feel healthy enough?' },
+      'pgwbi6Spirits': { es: '¿Cómo se sintió anímicamente?', en: 'How did you feel in spirits?' },
+      'pgwbi7Worried': { es: '¿Se ha sentido preocupado?', en: 'Have you been worried?' },
+      'pgwbi8Energy': { es: '¿Cuánta energía tuvo o sintió?', en: 'How much energy did you have or feel?' },
+      'pgwbi9Mood': { es: '¿Cómo fue su estado de ánimo?', en: 'How was your mood?' },
+      'pgwbi10Tension': { es: '¿Se sintió tenso?', en: 'Were you tense?' },
+      'pgwbi11Happiness': { es: '¿Qué tan feliz se sintió?', en: 'How happy did you feel?' },
+      'pgwbi12Interest': { es: '¿Su vida diaria estuvo llena de cosas interesantes?', en: 'Was your daily life full of interesting things?' },
+      'pgwbi13Calm': { es: '¿Se sintió tranquilo y en calma?', en: 'Did you feel calm and at ease?' },
+      'pgwbi14Sad': { es: '¿Se sintió triste o desanimado?', en: 'Did you feel sad or downhearted?' },
+      'pgwbi15Active': { es: '¿Se sintió activo y vigoroso?', en: 'Did you feel active and vigorous?' },
+      'pgwbi16Cheerful': { es: '¿Se sintió alegre y despreocupado?', en: 'Did you feel cheerful and lighthearted?' },
+      'pgwbi17Tired': { es: '¿Se sintió cansado o agotado?', en: 'Did you feel tired or exhausted?' },
+      'pgwbi18Pressure': { es: '¿Sintió presión, estrés o tensión?', en: 'Did you feel strain, stress or pressure?' }
+    };
+    return labels[key] ? labels[key][language === 'es' ? 'es' : 'en'] : key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace(/_/g, ' ').trim();
+  };
+
+  const formatKeyAsLabel = (key: string): string => {
+    return key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .replace(/_/g, ' ')
+      .trim();
+  };
 
   // Limpiar URL del blob cuando el componente se desmonte o el modal se cierre
   useEffect(() => {
@@ -1123,6 +1183,48 @@ function PatientDetailsModal({
     }
   };
 
+  const handleDeletePatient = async (patientId: string) => {
+    if (!token) {
+      alert(language === 'es' ? 'No hay token de autenticación' : 'No authentication token');
+      return;
+    }
+
+    const confirmMessage = language === 'es' 
+      ? '¿Estás seguro de que deseas eliminar este paciente? Esta acción no se puede deshacer.'
+      : 'Are you sure you want to delete this patient? This action cannot be undone.';
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    setDeletingPatient(true);
+    try {
+      const response = await fetch(`/api/admin/patients/${patientId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert(language === 'es' ? 'Paciente eliminado exitosamente' : 'Patient deleted successfully');
+        onClose();
+        // Recargar la página para actualizar la lista
+        window.location.reload();
+      } else {
+        alert(data.message || (language === 'es' ? 'Error al eliminar el paciente' : 'Error deleting patient'));
+      }
+    } catch (error) {
+      console.error('Error deleting patient:', error);
+      alert(language === 'es' ? 'Error al eliminar el paciente. Por favor, intenta de nuevo.' : 'Error deleting patient. Please try again.');
+    } finally {
+      setDeletingPatient(false);
+    }
+  };
+
   if (!patient && !loading) {
     return null;
   }
@@ -1139,17 +1241,54 @@ function PatientDetailsModal({
         <div className={`${bgColor} rounded-lg p-4 border-l-4 ${borderColor}`}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {Object.entries(data)
-              .filter(([_, value]) => value !== null && value !== undefined && value !== '')
-              .map(([key, value]) => (
-                <div key={key} className="border-b border-gray-200 pb-2">
-                  <div className="text-xs font-medium text-gray-500 uppercase mb-1">
-                    {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+              .filter(([_, value]) => {
+                if (value === null || value === undefined || value === '') return false;
+                if (typeof value === 'object' && !Array.isArray(value)) {
+                  return Object.keys(value).length > 0 && Object.values(value).some(v => v !== null && v !== undefined && v !== '');
+                }
+                return true;
+              })
+              .map(([key, value]) => {
+                // Obtener etiqueta
+                let label = formatKeyAsLabel(key);
+                if (key.startsWith('pgwbi')) {
+                  label = getPgwbiLabel(key);
+                }
+
+                // Obtener valor formateado
+                let displayValue: string;
+                if (typeof value === 'object' && value !== null) {
+                  if (Array.isArray(value)) {
+                    displayValue = value.join(', ');
+                  } else {
+                    displayValue = Object.entries(value)
+                      .filter(([_, v]) => v !== null && v !== undefined && v !== '')
+                      .map(([k, v]) => `${formatKeyAsLabel(k)}: ${v}`)
+                      .join(', ');
+                  }
+                } else {
+                  const strValue = String(value).trim();
+                  // Aplicar mapeos para PGWBI y GERD
+                  if (key.startsWith('pgwbi')) {
+                    displayValue = mapPgwbiValue(strValue);
+                  } else if (key.startsWith('gerd')) {
+                    displayValue = mapGerdValue(strValue);
+                  } else {
+                    displayValue = strValue;
+                  }
+                }
+
+                return (
+                  <div key={key} className="border-b border-gray-200 pb-2">
+                    <div className="text-xs font-medium text-gray-500 mb-1">
+                      {label}
+                    </div>
+                    <div className="text-sm text-gray-900">
+                      {displayValue}
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-900">
-                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
           </div>
         </div>
       </div>
@@ -1221,6 +1360,25 @@ function PatientDetailsModal({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
                       {language === 'es' ? 'Enviar Email' : 'Send Email'}
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleDeletePatient(patient.patientId)}
+                  disabled={deletingPatient || generatingPDF || sendingEmail}
+                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  {deletingPatient ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      {language === 'es' ? 'Eliminando...' : 'Deleting...'}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      {language === 'es' ? 'Eliminar Paciente' : 'Delete Patient'}
                     </>
                   )}
                 </button>
