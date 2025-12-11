@@ -184,9 +184,9 @@ export async function POST(request: NextRequest) {
 
     // Guardar los datos del formulario en la tabla específica
     // Función para asegurar que todos los valores sean strings
-    const mapStringValue = (value: string): string => {
+    const mapStringValue = (value: any): string => {
       // Si está vacío, undefined, null, o no es string, devolver string vacío
-      if (!value || value === '' || value === 'undefined' || value === 'null') {
+      if (value === null || value === undefined || value === '' || value === 'undefined' || value === 'null') {
         return '';
       }
       // Devolver el valor como string
