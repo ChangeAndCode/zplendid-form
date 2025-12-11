@@ -141,6 +141,65 @@ export function generatePatientPDF(
   
   yPosition += 40;
 
+  // Función auxiliar para formatear claves como etiquetas legibles
+  const formatKeyAsLabel = (key: string): string => {
+    return key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .replace(/_/g, ' ')
+      .trim();
+  };
+
+  // Función auxiliar para renderizar un campo individual
+  const renderField = (key: string, value: unknown, label: string) => {
+    if (!value || value === '' || value === null || value === undefined) return false;
+
+    checkPageBreak(12);
+    
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text(label + ':', margin + 5, yPosition);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    
+    // Manejar diferentes tipos de valores
+    let valueStr: string;
+    if (typeof value === 'object' && value !== null) {
+      // Si es un objeto, formatearlo de manera legible
+      if (Array.isArray(value)) {
+        valueStr = value.join(', ');
+      } else {
+        // Para objetos, crear una representación legible
+        const obj = value as Record<string, unknown>;
+        // Formato especial para dirección
+        if (key === 'address' && (obj.street || obj.addressLine || obj.city)) {
+          const parts: string[] = [];
+          if (obj.street || obj.addressLine) parts.push(String(obj.street || obj.addressLine));
+          if (obj.city) parts.push(String(obj.city));
+          if (obj.state) parts.push(String(obj.state));
+          if (obj.zip_code || obj.zipCode || obj.zipcode) parts.push(String(obj.zip_code || obj.zipCode || obj.zipcode));
+          if (obj.country) parts.push(String(obj.country));
+          valueStr = parts.join(', ');
+        } else {
+          // Para otros objetos, mostrar como lista
+          valueStr = Object.entries(obj)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(', ');
+        }
+      }
+    } else {
+      valueStr = String(value);
+    }
+    const lines = doc.splitTextToSize(valueStr, contentWidth - 15);
+    doc.text(lines, margin + 5, yPosition + 5);
+    
+    yPosition += 5 + (lines.length * 5) + 3;
+    return true;
+  };
+
   // Función auxiliar para renderizar una sección
   const renderSection = (
     title: string,
@@ -152,23 +211,39 @@ export function generatePatientPDF(
       return;
     }
 
+    // Crear un mapa de fields para búsqueda rápida
+    const fieldsMap = new Map<string, { label: string; labelEn: string }>();
+    fields.forEach(field => {
+      fieldsMap.set(field.key, { label: field.label, labelEn: field.labelEn });
+    });
+
+    // Obtener todos los campos con datos (excluyendo metadatos)
+    const excludedKeys = ['_id', 'medicalRecordId', 'createdAt', 'updatedAt'];
+    const allDataKeys = Object.keys(data).filter(key => {
+      const value = data[key];
+      return !excludedKeys.includes(key) && 
+             value !== null && 
+             value !== undefined && 
+             value !== '' &&
+             typeof value !== 'object' || (typeof value === 'object' && Object.keys(value as Record<string, unknown>).length > 0);
+    });
+
+    // Separar campos: los que están en fields y los que no
+    const fieldsInDefinition = allDataKeys.filter(key => fieldsMap.has(key));
+    const fieldsNotInDefinition = allDataKeys.filter(key => !fieldsMap.has(key));
+
     // Contar campos con datos para mostrar progreso
-    const fieldsWithData = fields.filter(field => {
-      const value = data[field.key];
-      return value && value !== '' && value !== null && value !== undefined;
-    }).length;
+    const fieldsWithData = fieldsInDefinition.length + fieldsNotInDefinition.length;
     const totalFields = fields.length;
     const completionPercentage = totalFields > 0 ? Math.round((fieldsWithData / totalFields) * 100) : 0;
 
     // Solo mostrar sección si tiene al menos un campo con datos
     if (fieldsWithData === 0) {
-      console.log(`⚠️ Sección "${title}" tiene ${Object.keys(data).length} campos en data pero ninguno coincide con los fields definidos`);
-      console.log(`   Campos en data:`, Object.keys(data).slice(0, 10));
-      console.log(`   Primeros fields esperados:`, fields.slice(0, 5).map(f => f.key));
+      console.log(`⚠️ Sección "${title}" tiene ${Object.keys(data).length} campos en data pero ninguno tiene valores válidos`);
       return;
     }
 
-    console.log(`✅ Renderizando sección "${title}": ${fieldsWithData}/${totalFields} campos con datos (${completionPercentage}%)`);
+    console.log(`✅ Renderizando sección "${title}": ${fieldsWithData} campos con datos (${fieldsInDefinition.length} definidos, ${fieldsNotInDefinition.length} adicionales)`);
 
     checkPageBreak(25);
     
@@ -187,55 +262,20 @@ export function generatePatientPDF(
     
     yPosition += 15;
 
-    // Campos de la sección
+    // Primero renderizar campos que están en la definición (con sus etiquetas)
     fields.forEach(field => {
-      const value = data[field.key];
-      if (!value || value === '' || value === null || value === undefined) return;
-
-      checkPageBreak(12);
-      
-      doc.setTextColor(80, 80, 80);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      const label = language === 'es' ? field.label : field.labelEn;
-      doc.text(label + ':', margin + 5, yPosition);
-      
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(10);
-      
-      // Manejar diferentes tipos de valores
-      let valueStr: string;
-      if (typeof value === 'object' && value !== null) {
-        // Si es un objeto, formatearlo de manera legible
-        if (Array.isArray(value)) {
-          valueStr = value.join(', ');
-        } else {
-          // Para objetos, crear una representación legible
-          const obj = value as Record<string, unknown>;
-          // Formato especial para dirección
-          if (field.key === 'address' && (obj.street || obj.addressLine || obj.city)) {
-            const parts: string[] = [];
-            if (obj.street || obj.addressLine) parts.push(String(obj.street || obj.addressLine));
-            if (obj.city) parts.push(String(obj.city));
-            if (obj.state) parts.push(String(obj.state));
-            if (obj.zip_code || obj.zipCode || obj.zipcode) parts.push(String(obj.zip_code || obj.zipCode || obj.zipcode));
-            if (obj.country) parts.push(String(obj.country));
-            valueStr = parts.join(', ');
-          } else {
-            // Para otros objetos, mostrar como lista
-            valueStr = Object.entries(obj)
-              .map(([k, v]) => `${k}: ${v}`)
-              .join(', ');
-          }
-        }
-      } else {
-        valueStr = String(value);
+      if (fieldsInDefinition.includes(field.key)) {
+        const value = data[field.key];
+        const label = language === 'es' ? field.label : field.labelEn;
+        renderField(field.key, value, label);
       }
-      const lines = doc.splitTextToSize(valueStr, contentWidth - 15);
-      doc.text(lines, margin + 5, yPosition + 5);
-      
-      yPosition += 5 + (lines.length * 5) + 3;
+    });
+
+    // Luego renderizar campos adicionales que no están en la definición
+    fieldsNotInDefinition.forEach(key => {
+      const value = data[key];
+      const label = formatKeyAsLabel(key);
+      renderField(key, value, label);
     });
   };
 
