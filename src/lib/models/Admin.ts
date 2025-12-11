@@ -152,7 +152,7 @@ export class AdminModel {
                   $toInt: { 
                     $substr: [
                       { $toString: '$_id' }, 
-                      -8, 
+                      { $subtract: [{ $strLenCP: { $toString: '$_id' } }, 8] }, 
                       8
                     ] 
                   } 
@@ -219,7 +219,7 @@ export class AdminModel {
                   $toInt: { 
                     $substr: [
                       { $toString: '$_id' }, 
-                      -8, 
+                      { $subtract: [{ $strLenCP: { $toString: '$_id' } }, 8] }, 
                       8
                     ] 
                   } 
@@ -501,7 +501,7 @@ export class AdminModel {
                   $toInt: { 
                     $substr: [
                       { $toString: '$_id' }, 
-                      -8, 
+                      { $subtract: [{ $strLenCP: { $toString: '$_id' } }, 8] }, 
                       8
                     ] 
                   } 
@@ -628,7 +628,7 @@ export class AdminModel {
                   $toInt: { 
                     $substr: [
                       { $toString: '$_id' }, 
-                      -8, 
+                      { $subtract: [{ $strLenCP: { $toString: '$_id' } }, 8] }, 
                       8
                     ] 
                   } 
@@ -711,7 +711,7 @@ export class AdminModel {
                   $toInt: { 
                     $substr: [
                       { $toString: '$_id' }, 
-                      -8, 
+                      { $subtract: [{ $strLenCP: { $toString: '$_id' } }, 8] }, 
                       8
                     ] 
                   } 
