@@ -141,9 +141,29 @@ export class AuthController {
         token,
         patientId: patientRecord.patientId // Incluir el ID del expediente
       }, { status: 200 });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error en login:', error);
-      return NextResponse.json({ success: false, message: 'Error interno del servidor' }, { status: 500 });
+      
+      // Detectar errores de conexión específicos
+      if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        return NextResponse.json({ 
+          success: false, 
+          message: 'Error de conexión a la base de datos. Verifica la configuración de las variables de entorno.' 
+        }, { status: 503 });
+      }
+      
+      // Error de autenticación de base de datos
+      if (error.code === 'ER_ACCESS_DENIED_ERROR' || error.code === 'ER_NOT_SUPPORTED_AUTH_MODE') {
+        return NextResponse.json({ 
+          success: false, 
+          message: 'Error de autenticación con la base de datos. Verifica las credenciales.' 
+        }, { status: 503 });
+      }
+      
+      return NextResponse.json({ 
+        success: false, 
+        message: error.message || 'Error interno del servidor' 
+      }, { status: 500 });
     }
   }
 

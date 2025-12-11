@@ -67,7 +67,13 @@ function createPool(): mysql.Pool {
     connectionLimit: 5,
     queueLimit: 0,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 0
+    keepAliveInitialDelay: 0,
+    // Configuración de timeouts para Render
+    connectTimeout: 30000, // 30 segundos para establecer conexión
+    acquireTimeout: 30000, // 30 segundos para adquirir conexión del pool
+    timeout: 30000, // 30 segundos para queries
+    // SSL si es necesario (para bases de datos remotas)
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
   });
 }
 
@@ -76,6 +82,17 @@ export const getConnection = async (): Promise<mysql.Pool> => {
     try {
       pool = createPool();
       console.log('✅ Pool MySQL inicializado');
+      
+      // Verificar conexión inmediatamente
+      try {
+        const testConnection = await pool.getConnection();
+        await testConnection.ping();
+        testConnection.release();
+        console.log('✅ Conexión a MySQL verificada exitosamente');
+      } catch (pingError) {
+        console.error('❌ Error al verificar conexión MySQL:', pingError);
+        // No lanzar error aquí, solo loguear - el pool se creó pero la conexión falla
+      }
     } catch (error) {
       console.error('❌ Error al crear el pool de MySQL:', error);
       throw error;
