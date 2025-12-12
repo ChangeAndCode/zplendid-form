@@ -15,7 +15,8 @@
     "test-mongodb": "tsx src/lib/scripts/test-mongodb.ts",
     "test-claude-4": "tsx src/lib/scripts/test-claude-4.ts",
     "test-chat-english": "tsx src/lib/scripts/test-chat-english.ts",
-    "debug-chat-api": "tsx src/lib/scripts/debug-chat-api.ts"
+    "debug-chat-api": "tsx src/lib/scripts/debug-chat-api.ts",
+    "init-appointments-tables": "tsx src/lib/scripts/init-appointments-tables.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",

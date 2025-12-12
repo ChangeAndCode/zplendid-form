@@ -15,6 +15,8 @@ export default function Dashboard() {
       router.push('/');
     } else if (!isLoading && user && user.role === 'admin') {
       router.push('/admin');
+    } else if (!isLoading && user && user.role === 'doctor') {
+      router.push('/doctor/dashboard');
     }
   }, [isAuthenticated, isLoading, user, router]);
 
@@ -134,6 +136,31 @@ export default function Dashboard() {
             </button>
           </div>
 
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="flex items-center mb-4">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-[#212e5c] ml-3">
+                {language === 'es' ? 'Agendar Cita' : 'Book Appointment'}
+              </h3>
+            </div>
+            <p className="text-gray-600 mb-4">
+              {language === 'es' 
+                ? 'Agenda una nueva cita con un doctor disponible.'
+                : 'Book a new appointment with an available doctor.'
+              }
+            </p>
+            <button 
+              onClick={() => router.push('/appointments/book')}
+              className="text-[#212e5c] hover:text-[#1a2347] font-medium"
+            >
+              {language === 'es' ? 'Agendar Ahora' : 'Book Now'} →
+            </button>
+          </div>
+
           <MedicalRecordCard language={language} token={token || ''} />
 
           <div className="bg-white rounded-lg shadow-lg p-6">
@@ -153,7 +180,10 @@ export default function Dashboard() {
                 : 'Manage your medical appointments.'
               }
             </p>
-            <button className="text-[#212e5c] hover:text-[#1a2347] font-medium">
+            <button 
+              onClick={() => router.push('/appointments/my-appointments')}
+              className="text-[#212e5c] hover:text-[#1a2347] font-medium"
+            >
               {language === 'es' ? 'Ver Citas' : 'View Appointments'} →
             </button>
           </div>

@@ -197,6 +197,14 @@ export default function LandingPage() {
           <h1 className="text-2xl font-bold text-[#212e5c] tracking-tight">zplendid</h1>
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
+            {user?.role === 'user' && (
+              <a
+                href="/dashboard"
+                className="bg-[#212e5c] text-white px-4 py-1 rounded text-sm hover:bg-[#1a2347] transition-colors"
+              >
+                {language === 'es' ? 'Dashboard' : 'Dashboard'}
+              </a>
+            )}
             {user?.role === 'admin' && (
               <a
                 href="https://zplendid-form-7gqi.onrender.com/dashboard"
@@ -249,8 +257,8 @@ export default function LandingPage() {
           )}
         </div>
 
-        {/* Main Options - Two Big Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
+        {/* Main Options - Three Big Buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
           {/* Conversational Assistant Button */}
           <a
             href="/chat"
@@ -308,6 +316,37 @@ export default function LandingPage() {
               </div>
             </div>
           </a>
+
+          {/* Dashboard Button - Solo para pacientes */}
+          {user?.role === 'user' && (
+            <a
+              href="/dashboard"
+              className="group block w-full bg-gradient-to-br from-green-600 to-green-700 rounded-xl border border-green-600 hover:from-green-700 hover:to-green-800 transition-all duration-300 text-left cursor-pointer shadow-lg hover:shadow-2xl transform hover:-translate-y-1"
+            >
+              <div className="p-8 h-full flex flex-col justify-between">
+                <div>
+                  <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-4xl mb-6 group-hover:scale-110 transition-transform duration-300">
+                    📊
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-3">
+                    {language === 'es' ? 'Panel de Control' : 'Dashboard'}
+                  </h3>
+                  <p className="text-green-100 text-lg leading-relaxed">
+                    {language === 'es'
+                      ? 'Accede a tu expediente médico, citas y más opciones.'
+                      : 'Access your medical record, appointments and more options.'}
+                  </p>
+                </div>
+
+                <div className="mt-8 flex items-center text-green-200 font-medium group-hover:text-white transition-colors">
+                  <span>{language === 'es' ? 'Ir al Dashboard' : 'Go to Dashboard'}</span>
+                  <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </div>
+              </div>
+            </a>
+          )}
         </div>
 
         {/* Contact Section - minimalista */}
