@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { JWTUtils } from '../../../../../../lib/utils/jwt';
-import { AppointmentModel } from '../../../../../../lib/models/Appointment';
-import { getCollection } from '../../../../../../lib/config/database';
+import { JWTUtils } from '../../../../../lib/utils/jwt';
+import { AppointmentModel } from '../../../../../lib/models/Appointment';
+import { getCollection } from '../../../../../lib/config/database';
 import { ObjectId } from 'mongodb';
 
 /**

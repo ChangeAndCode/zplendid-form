@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { JWTUtils } from '../../../../../../lib/utils/jwt';
-import { AppointmentModel } from '../../../../../../lib/models/Appointment';
-import { getCollection } from '../../../../../../lib/config/database';
+import { JWTUtils } from '../../../../../lib/utils/jwt';
+import { AppointmentModel } from '../../../../../lib/models/Appointment';
+import { getCollection } from '../../../../../lib/config/database';
 import { ObjectId } from 'mongodb';
-import { AppointmentStatus } from '../../../../../../lib/types/appointments';
+import { AppointmentStatus } from '../../../../../lib/types/appointments';
 
 /**
  * PUT /api/doctor/appointments/[appointmentId]/status - Actualizar estado de cita

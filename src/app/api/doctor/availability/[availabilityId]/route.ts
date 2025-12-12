@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { JWTUtils } from '../../../../../../lib/utils/jwt';
-import { DoctorAvailabilityModel } from '../../../../../../lib/models/DoctorAvailability';
-import { getCollection } from '../../../../../../lib/config/database';
+import { JWTUtils } from '../../../../../lib/utils/jwt';
+import { DoctorAvailabilityModel } from '../../../../../lib/models/DoctorAvailability';
+import { getCollection } from '../../../../../lib/config/database';
 import { ObjectId } from 'mongodb';
-import { DoctorAvailabilityCreate } from '../../../../../../lib/types/appointments';
+import { DoctorAvailabilityCreate } from '../../../../../lib/types/appointments';
 
 /**
  * DELETE /api/doctor/availability/[availabilityId] - Eliminar disponibilidad
