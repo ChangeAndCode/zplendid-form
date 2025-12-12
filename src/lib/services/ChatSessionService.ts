@@ -1,4 +1,5 @@
-import { MongoClient, Db, Collection } from 'mongodb';
+import { Collection } from 'mongodb';
+import { getCollection } from '../config/database';
 
 interface Message {
   id: string;
@@ -20,43 +21,25 @@ interface ChatSession {
 }
 
 class ChatSessionService {
-  private client: MongoClient | null = null;
-  private db: Db | null = null;
   private collection: Collection<ChatSession> | null = null;
 
   constructor() {
     // No conectar automáticamente en el constructor
   }
 
-  private async connect() {
-    if (this.client && this.db && this.collection) {
-      return; // Ya conectado
+  private async getCollectionInstance(): Promise<Collection<ChatSession>> {
+    if (!this.collection) {
+      this.collection = await getCollection<ChatSession>('chat_sessions');
     }
-
-    try {
-      const mongoUri = process.env.MONGODB_URI;
-      if (!mongoUri) {
-        throw new Error('MONGODB_URI environment variable is not set');
-      }
-
-      this.client = new MongoClient(mongoUri);
-      await this.client.connect();
-      this.db = this.client.db('zplendid');
-      this.collection = this.db.collection<ChatSession>('chat_sessions');
-      
-      console.log('Connected to MongoDB for chat sessions');
-    } catch (error) {
-      console.error('Error connecting to MongoDB:', error);
-      throw error;
-    }
+    return this.collection;
   }
 
   private async ensureConnection() {
-    await this.connect();
+    await this.getCollectionInstance();
   }
 
   async createSession(patientId: string = 'guest'): Promise<ChatSession> {
-    await this.ensureConnection();
+    const collection = await this.getCollectionInstance();
 
     const sessionId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const session: ChatSession = {
@@ -70,20 +53,19 @@ class ChatSessionService {
       updatedAt: new Date()
     };
 
-    await this.collection.insertOne(session);
+    await collection.insertOne(session);
     return session;
   }
 
   async getSession(sessionId: string): Promise<ChatSession | null> {
-    await this.ensureConnection();
-
-    return await this.collection.findOne({ id: sessionId });
+    const collection = await this.getCollectionInstance();
+    return await collection.findOne({ id: sessionId });
   }
 
   async updateSession(sessionId: string, updates: Partial<ChatSession>): Promise<ChatSession | null> {
-    await this.ensureConnection();
+    const collection = await this.getCollectionInstance();
 
-    const result = await this.collection.findOneAndUpdate(
+    const result = await collection.findOneAndUpdate(
       { id: sessionId },
       { 
         $set: { 
@@ -98,9 +80,9 @@ class ChatSessionService {
   }
 
   async addMessage(sessionId: string, message: Message): Promise<ChatSession | null> {
-    await this.ensureConnection();
+    const collection = await this.getCollectionInstance();
 
-    const result = await this.collection.findOneAndUpdate(
+    const result = await collection.findOneAndUpdate(
       { id: sessionId },
       { 
         $push: { messages: message },
@@ -113,9 +95,9 @@ class ChatSessionService {
   }
 
   async updateExtractedData(sessionId: string, data: Record<string, any>): Promise<ChatSession | null> {
-    await this.ensureConnection();
+    const collection = await this.getCollectionInstance();
 
-    const result = await this.collection.findOneAndUpdate(
+    const result = await collection.findOneAndUpdate(
       { id: sessionId },
       { 
         $set: { 
@@ -130,18 +112,16 @@ class ChatSessionService {
   }
 
   async getPatientSessions(patientId: string): Promise<ChatSession[]> {
-    await this.ensureConnection();
+    const collection = await this.getCollectionInstance();
 
-    return await this.collection
+    return await collection
       .find({ patientId })
       .sort({ createdAt: -1 })
       .toArray();
   }
 
   async close() {
-    if (this.client) {
-      await this.client.close();
-    }
+    // Ya no necesitamos cerrar conexión aquí, se maneja globalmente
   }
 }
 
